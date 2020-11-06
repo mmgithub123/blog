@@ -1,3 +1,3 @@
 # blog
 
-just  recard  some  trouble shooting  or  useful airtical.and make my englist write good.
+just  record  some  trouble shooting  or  useful artical.and improve my englist write skill
