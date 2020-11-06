@@ -1,0 +1,86 @@
+level=warning msg="Usage of loopback devices is strongly discouraged for production use. Please us
+11月 06 18:59:45 localhost.localdomain dockerd[2187]: time="2020-11-06T18:59:45.430985673+08:00" level=info msg="Creating filesystem xfs on device docker-253:1-2349311829-base, mkfs args: [-m crc
+11月 06 18:59:45 localhost.localdomain dockerd[2187]: time="2020-11-06T18:59:45.432250550+08:00" level=info msg="Error while creating filesystem xfs on device docker-253:1-2349311829-base: exit s
+11月 06 18:59:45 localhost.localdomain dockerd[2187]: time="2020-11-06T18:59:45.432279212+08:00" level=error msg="[graphdriver] prior storage driver devicemapper failed: exit status 1"
+11月 06 18:59:45 localhost.localdomain dockerd[2187]: failed to start daemon: error initializing graphdriver: exit status 1
+11月 06 18:59:45 localhost.localdomain systemd[1]: docker.service: main process exited, code=exited, status=1/FAILURE
+11月 06 18:59:45 localhost.localdomain systemd[1]: Failed to start Docker Application Container Engine.
+
+用yum 安装docker  在centos7下面，报错 error initializing graphdriver: exit status 1
+Error while creating filesystem xfs on device docker
+
+解决办法，需要升级一下mkfs.xfs
+使用 yum update xfsprogs 命令
+当前时间版本到mkfs.xfs -V
+mkfs.xfs version 4.5.0
+解决问题
+
+（
+when install docker use yum under centos7 system ,
+use command:
+sudo yum install -y yum-utils
+sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io
+    
+it's well,
+
+and go on ,type command:
+sudo systemctl start docker
+
+it output:
+Job for docker.service failed because the control process exited with error code. See "systemctl status docker.service" and "journalctl -xe" for details.
+
+systemctl status docker.service
+● docker.service - Docker Application Container Engine
+   Loaded: loaded (/usr/lib/systemd/system/docker.service; disabled; vendor preset: disabled)
+   Active: failed (Result: start-limit) since 五 2020-11-06 18:38:13 CST; 20s ago
+     Docs: https://docs.docker.com
+  Process: 29966 ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock (code=exited, status=1/FAILURE)
+ Main PID: 29966 (code=exited, status=1/FAILURE)
+
+level=error msg="failed to mount overlay: no such device" storage-driver=overla
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.047251466+08:00" level=error msg="AUFS was not found in /proc/filesystems" storage-driver=aufs
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.048988009+08:00" level=error msg="failed to mount overlay: no such device" storage-driver=overla
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.698036130+08:00" level=warning msg="Usage of loopback devices is strongly discouraged for produc
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.760706613+08:00" level=info msg="Creating filesystem xfs on device docker-253:1-2349311829-base,
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.790828869+08:00" level=info msg="Error while creating filesystem xfs on device docker-253:1-2349
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: time="2020-11-06T18:17:41.791086768+08:00" level=warning msg="Failed to deactivatePool: Device is Busy" storage-driver=dev
+11月 06 18:17:41 localhost.localdomain dockerd[27565]: failed to start daemon: error initializing graphdriver: exit status 1
+11月 06 18:17:41 localhost.localdomain systemd[1]: docker.service: main process exited, code=exited, status=1/FAILURE
+11月 06 18:17:41 localhost.localdomain systemd[1]: Failed to start Docker Application Container Engine.
+11月 06 18:17:41 localhost.localdomain systemd[1]: Unit docker.service entered failed state.
+11月 06 18:17:41 localhost.localdomain systemd[1]: docker.service failed.
+
+the key is :
+Error while creating filesystem xfs on device docker
+
+and  we can upgrade the mkfs.xfs to fix it. the command is:
+yum update xfsprogs 
+
+when do it done.use command :
+mkfs.xfs -V
+you can see:
+mkfs.xfs version 4.5.0
+
+and do 
+sudo systemctl start docker
+again.
+
+the problem fix:
+ systemctl status docker.service
+● docker.service - Docker Application Container Engine
+   Loaded: loaded (/usr/lib/systemd/system/docker.service; disabled; vendor preset: disabled)
+   Active: active (running) since 五 2020-11-06 19:13:55 CST; 30min ago
+     Docs: https://docs.docker.com
+ Main PID: 25943 (dockerd)
+   Memory: 46.3M
+   CGroup: /system.slice/docker.service
+           └─25943 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+           
+           
+you can see, active(running)
+
+）
+
