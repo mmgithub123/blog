@@ -1,0 +1,54 @@
+ 
+
+比如：
+
+查看挂载
+
+df -hT
+Filesystem Type Size Used Avail Use% Mounted on
+//ip/scandata cifs 985G 51G 935G 6% /opt/scandata
+
+ 
+
+执行chown 改变属主
+
+sudo chown -R app:app /opt/scandata/
+
+ 
+
+但查看还是root
+
+[x@5onf]$    ls -lah /opt/scandata
+total 0
+drwxr-xr-x 2 root root 0 Jan 24 16:57 .
+drwxr-xr-x. 8 root root 120 Jan 25 17:36 ..
+drwxr-xr-x 2 root root 0 Jan 24 15:48 lost+found
+drwxr-xr-x 2 root root 0 Jan 24 17:55 test
+-rwxr-xr-x 1 root root 0 Jan 24 16:42 test.txt
+
+ 
+
+这里需要挂载的时候就指定uid 和gid，这样挂载后就是属于app:app了
+
+ 
+
+比如挂载：
+
+sudo mount -t cifs  //ip地址/scandata /opt/scandata -o uid=（指定挂载后目录的属主）,gid=（指定挂载后目录的组）,username=,password=
+
+在fstab里：
+
+//ip地址/scandata      /opt/scandata               cifs     uid=,gid=,rw,suid,dev,exec,auto,nouser,async,username=,password=        0 0
+
+ 
+
+现在查看：
+
+[@1 ~]$    ls -lah /opt/scandata
+total 0
+drwxr-xr-x 2 app app 0 Jan 26 15:47 .
+drwxr-xr-x. 11 root root 160 Jan 25 17:36 ..
+drwxr-xr-x 2 app app 0 Jan 24 15:48 lost+found
+drwxr-xr-x 2 app app 0 Jan 24 17:55 test
+-rwxr-xr-x 1 app app 0 Jan 26 15:45 testapp.log
+-rwxr-xr-x 1 app app 0 Jan 26 15:47 testserverapp.log
