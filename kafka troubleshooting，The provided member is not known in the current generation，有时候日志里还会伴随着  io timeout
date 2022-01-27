@@ -1,0 +1,153 @@
+客户端log：The provided member is not known in the current generation
+
+也伴随： i/o timeout
+
+ 
+
+ 
+
+sever  log：
+
+[2022-01-19 19:22:03,158] WARN [GroupCoordinator 0]: Sending empty assignment to member watermill-7d16c5e1-284d-45f4-a3e3-f21e306a480b of tws for generation 14 with no errors (kafka.coordinator.group.GroupCoordinator)
+[2022-01-19 19:22:03,158] WARN [GroupCoordinator 0]: Sending empty assignment to member watermill-20467c49-0d37-417c-85c8-d703e4ca0172 of tws for generation 14 with no errors (kafka.coordinator.group.GroupCoordinator)
+
+ 
+
+with generation 48 (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:20:04,498] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in Stable state. Created a new member id watermill-9ce047a7-1145-4481-be91-953760cb601e for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:20:04,498] INFO [GroupCoordinator 0]: Preparing to rebalance group avast in state PreparingRebalance with old generation 48 (__consumer_offsets-23) (reason: Adding new member watermill-9ce047a7-1145-4481-be91-953760cb601e with group instance id None) (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:20:07,932] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-e1808013-a69e-426c-a21b-e08b9afc4bff for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:20:34,506] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-b0ba512a-ba9a-4de7-afb8-ded7564c2c86 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:20:37,946] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-df1a82b6-b2d7-4a1a-8255-828206492a78 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:04,501] INFO [GroupCoordinator 0]: Group avast removed dynamic members who haven't joined: Set(watermill-09d871f1-e9a7-4854-af0b-55c9ce439d11, watermill-be10473b-4021-4a66-9176-994887db1ef0) (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:04,501] INFO [GroupCoordinator 0]: Stabilized group avast generation 49 (__consumer_offsets-23) with 4 members (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:34,509] INFO [GroupCoordinator 0]: Preparing to rebalance group avast in state PreparingRebalance with old generation 49 (__consumer_offsets-23) (reason: Removing member watermill-b0ba512a-ba9a-4de7-afb8-ded7564c2c86 on LeaveGroup) (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:34,509] INFO [GroupCoordinator 0]: Member MemberMetadata(memberId=watermill-b0ba512a-ba9a-4de7-afb8-ded7564c2c86, groupInstanceId=None, clientId=watermill, clientHost=/192.168.102.158, sessionTimeoutMs=600000, rebalanceTimeoutMs=60000, supportedProtocols=List(roundrobin)) has left group avast through explicit `LeaveGroup` request (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:34,509] INFO [GroupCoordinator 0]: Member MemberMetadata(memberId=watermill-df1a82b6-b2d7-4a1a-8255-828206492a78, groupInstanceId=None, clientId=watermill, clientHost=/192.168.102.159, sessionTimeoutMs=600000, rebalanceTimeoutMs=60000, supportedProtocols=List(roundrobin)) has left group avast through explicit `LeaveGroup` request (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:34,517] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-5aa111c8-d7e3-43fb-827f-75be3f362fe1 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:21:34,522] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-d5f13e11-71c8-4b87-b76e-9dbf8c44cfb9 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:22:04,579] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-ac0b6540-57e4-4ba6-9d0b-bcd14a7b0f18 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:22:07,028] INFO [GroupCoordinator 0]: Dynamic Member with unknown member id joins group avast in PreparingRebalance state. Created a new member id watermill-86c882a8-b2ce-41c8-8a23-799d469ff8e6 for this member and add to the group. (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:22:34,509] INFO [GroupCoordinator 0]: Group avast removed dynamic members who haven't joined: Set(watermill-9ce047a7-1145-4481-be91-953760cb601e, watermill-e1808013-a69e-426c-a21b-e08b9afc4bff) (kafka.coordinator.group.GroupCoordinator)
+
+[2022-01-19 19:22:34,509] INFO [GroupCoordinator 0]: Stabilized group avast generation 50 (__consumer_offsets-23) with 4 memb
+
+ 
+
+使用：
+
+正常应该：
+
+一个client，一个group，对应一个topic
+
+实际是：
+一个client，一个group，对应两个topic，三个partition
+
+ 
+
+可能原因1：
+
+https://github.com/Shopify/sarama/issues/1192
+
+https://github.com/Shopify/sarama/blob/v1.19.0/consumer_group.go#L18
+
+// Consume joins a cluster of consumers for a given list of topics and
+ 	// starts a blocking ConsumerGroupSession through the ConsumerGroupHandler.
+ 	//
+ 	// The life-cycle of a session is represented by the following steps:
+ 	//
+ 	// 1. The consumers join the group (as explained in https://kafka.apache.org/documentation/#intro_consumers)
+ 	// and is assigned their "fair share" of partitions, aka 'claims'.
+ 	// 2. Before processing starts, the handler's Setup() hook is called to notify the user
+ 	// of the claims and allow any necessary preparation or alteration of state.
+ 	// 3. For each of the assigned claims the handler's ConsumeClaim() function is then called
+ 	// in a separate goroutine which requires it to be thread-safe. Any state must be carefully protected
+ 	// from concurrent reads/writes.
+ 	// 4. The session will persist until one of the ConsumeClaim() functions exits. This can be either when the
+ 	// parent context is cancelled or when a server-side rebalance cycle is initiated.
+ 	// 5. Once all the ConsumeClaim() loops have exited, the handler's Cleanup() hook is called
+ 	// to allow the user to perform any final tasks before a rebalance.
+ 	// 6. Finally, marked offsets are committed one last time before claims are released.
+ 	//
+ 	// Please note, that once a relance is triggered, sessions must be completed within
+ 	// Config.Consumer.Group.Rebalance.Timeout. This means that ConsumeClaim() functions must exit
+ 	// as quickly as possible to allow time for Cleanup() and the final offset commit. If the timeout
+ 	// is exceeded, the consumer will be removed from the group by Kafka, which will cause offset
+ 	// commit failures.
+// Please note, that once a relance is triggered, sessions must be completed within
+ 	// Config.Consumer.Group.Rebalance.Timeout. This means that ConsumeClaim() functions must exit
+ 	// as quickly as possible to allow time for Cleanup() and the final offset commit. If the timeout
+ 	// is exceeded, the consumer will be removed from the group by Kafka, which will cause offset
+ 	// commit failures.
+ 
+
+ 
+
+可能原因2：
+
+线上一组 kafka 消费者在运行了很多天之后突然积压，日志显示该 kafka 消费者频繁 rebalance 并且大概率返回失败。
+
+错误消息如下
+
+kafka server: The provided member is not known in the current generation
+
+Request was for a topic or partition that does not exist on this broker
+有时候日志里还会伴随着
+
+i/o timeout
+我们添加了 errors 和 notifications 日志，发现每次错误都伴随着 rebalance。
+
+我们首先认为是超时时间过短导致的，于是我们调大了连接超时和读写超时，但是问题没有得到解决。
+
+我们又认为是我们处理信息的时间过长，导致 kafka server 认为 client 死掉了，然后进行 rebalance 导致的。于是我们将每条获取到的 message 放到 channel 中，由多个消费者去消费 channel 来解决问题，但是问题仍然没有解决。我们阅读了 sarama 的 heartbeat 机制，发现每个 consumer 都有单独的 goroutine 每 3 秒发送一次心跳。因此这个处理时间应该只会导致消费速度下降，不会导致 rebalance。
+
+我们于是只好另外启动了一个消费者，指定了另外一个 group id，在消费过程中，我们看到并未发生 rebalance。这时我们更加一头雾水了。
+
+直到我们看到了这篇文章 kafka consumer 频繁 reblance，这篇文章提到：
+
+kafka 不同 topic 的 consumer 如果用的 group id 名字一样的情况下，其中任意一个 topic 的 consumer 重新上下线都会造成剩余所有的 consumer 产生 reblance 行为。
+
+而我们正是不同的 topic 下有名字相同的 group id 的多个消费者。为了验证确实是由这个问题导致的，我们暂停了该 group id 下其他消费者的消费，之前频繁 rebalance 的消费者果真再也没有发生过 rebalance。
+
+于是我们更改了这些消费者的 group id，以不同后缀进行区分，问题便解决了。
+
+即使大家不是同一个topic，这主要是由于kafka官方支持一个consumer同时消费多个topic的情况，所以在zk上一个consumer出问题后zk是直接把group下面所有的consumer都通知一遍
+
+ 
+
+（消费多个topic，那么多个topic下的partition就要合并计算了，对应consumer的时候）
+
+ 
+
+Solution is simple, just use a unique consumer group name.  Avoid generic consumer group names by all means.
+
+We had put a very good time in naming topics but not in consumer group names.  This experience has led us to put good time in naming the consumer groups not only well, but unique.
+
+ 
+
+ 可能原因3：
+
+watermill库的问题
+
+ 
+
+参考链接：
+
+https://www.cnblogs.com/chanshuyi/p/kafka_rebalance_quick_guide.html
+
+https://olnrao.wordpress.com/2015/05/15/apache-kafka-case-of-mysterious-rebalances/
