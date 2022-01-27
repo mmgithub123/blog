@@ -1,0 +1,13 @@
+主要是网络那一块。
+
+虚拟机网络适配器里使用NAT网络。
+
+然后修改/etc/sysconfig/network-scripts/ifcfg-ens33
+
+把bootproto改成dhcp，
+
+把onboot改成yes，
+
+然后systemctl restart network即可。
+
+ 
