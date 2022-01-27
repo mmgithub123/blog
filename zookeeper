@@ -1,0 +1,6 @@
+wget https://archive.apache.org/dist/zookeeper/zookeeper-3.6.3/apache-zookeeper-3.6.3-bin.tar.gz
+
+tar -zxvf apache-zookeeper-3.6.3-bin.tar.gz
+
+bin/zkServer.sh start   启动
+ 客户端访问2181
