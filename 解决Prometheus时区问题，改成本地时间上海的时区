@@ -1,0 +1,58 @@
+ 
+
+官方Prometheus镜像，使用的不是咱们上海的时区，我们可以用上海时区文件创建一个configmap，然后挂载到启动的Prometheus容器里：
+
+kubectl create configmap prometheus-time-zone --from-file=/usr/share/zoneinfo/Asia/Shanghai
+然后挂载：
+volumeMounts:
+- name: prometheus-time-zone
+mountPath: /etc/localtime
+subPath: Shanghai
+
+
+
+然后可以把容器里的时区改成上海时区，东八区
+
+
+用date 验证时间是本地时间了
+
+ 
+
+但这个只是改了Prometheus容器得本地时区文件而已。centos系统 就是/etc/localtime   Ubuntu是/etc/timezone   
+
+但是Prometheus 是在代码里，统一做得UTC转换
+
+类似这样：
+
+
+
+ 
+
+所以机器上（容器里）的时区并不起作用。
+
+ 
+
+至于为什么这么做，官方给了说明：
+
+Can I change the timezone? Why is everything in UTC?
+To avoid any kind of timezone confusion, especially when the so-called daylight saving time is involved, we decided to exclusively use Unix time internally and UTC for display purposes in all components of Prometheus. A carefully done timezone selection could be introduced into the UI. Contributions are welcome. See issue #500 for the current state of this effort.
+
+ 
+
+github  讨论：
+
+https://github.com/prometheus/prometheus/issues/500
+
+ 
+
+所以想做时间本地化，就直接在外部程序做好了。
+
+其实官方也是这样做的：
+
+
+
+ 
+
+这里的use local time 就是输出后，前端js做了一次转换。
+
+ 
