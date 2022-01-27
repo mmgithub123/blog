@@ -1,0 +1,9 @@
+telnet 使用23端口
+
+ 
+
+centos  
+
+yum install telnet-server
+
+systemctl start telnet.socket
