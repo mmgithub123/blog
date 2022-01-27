@@ -1,0 +1,57 @@
+1. 用df 检查发现根目录可用空间越为200M
+
+# df -h
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/xvde1            9.9G  9.4G  232M  36% /
+none                  7.4G   16K  7.4G   1% /dev/shm
+2. 用du命令查看根目录各子目录占用空间,可以发现6G的空间莫名其妙地丢了
+
+复制代码
+# du -sm /* | sort -nr | head
+1755    /usr
+664    /var
+538    /lib
+331    /opt
+104    /boot
+31    /etc
+23    /lib64
+14    /sbin
+9    /bin
+复制代码
+3. 用lsof命令查看有很多处于deleted状态的进程
+
+复制代码
+# lsof | grep delete
+cbdaemon    993        root    5w      REG             202,65      388      65623 /var/log/cb/sensor/cbdaemon.ec2s-usercassandra-02.invalid-user.log.ERROR.20170713-143157.993 (deleted)
+salt-mini  1761        root    0r      REG             202,65       17      16389 /tmp/sh-thd-1499978414 (deleted)
+salt-mini  1761        root    6w      REG             202,65      265     347691 /var/log/salt/minion-20170714 (deleted)
+salt-mini  1762        root    0r      REG             202,65       17      16389 /tmp/sh-thd-1499978414 (deleted)
+salt-mini  1762        root    6w      REG             202,65      265     347691 /var/log/salt/minion-20170714 (deleted)
+filebeat   1852        root   10r      REG             202,65  6292254      75366 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   12r      REG             202,65  6291461      74061 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   14r      REG             202,65  6291523      74051 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   15r      REG             202,65  6291516      74050 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   16r      REG             202,65  6291575      74052 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   17r      REG             202,65  6291508      74049 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   18r      REG             202,65  6291824      74053 /var/log/audit/audit.log.4 (deleted)
+filebeat   1852        root   19r      REG             202,65  6291512      74054 /var/log/audit/audit.log.4 (deleted)
+
+
+ 4. 根据lsof列出的进程号，kill这些进程,稍等片刻,再查看磁盘容量使用情况,注意如果不熟悉进程的作用,请不要随意kill
+
+# kill -9 1852
+# df -h
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/xvde1            9.9G  3.3G  6.1G  36% /
+none                  7.4G   16K  7.4G   1% /dev/shm
+ 原理:
+
+在linux上被删除的文件仍被其他进程所使用，文件句柄没有完全释放出来，导致空间无法释放出来,在Linux或者Unix系统中，通过rm或者文件管理器删除文件将会从文件系统的目录结构上解除链接(unlink).然而如果文件是被打开的（有一个进程正在使用），那么进程将仍然可以读取该文件，磁盘空间也一直被占用。
+
+解决：
+一、通过lsof |grep deleted查看被占用文件
+
+二、释放被占用文件磁盘空间
+
+kill掉相应的进程
+停掉使用这个文件的应用，让os自动回收磁盘空间
