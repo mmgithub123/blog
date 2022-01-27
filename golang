@@ -1,0 +1,8 @@
+使用golang开发，导包的时候，需要配置go包代理，这里用七牛云的，稳定 七牛云 - Goproxy.cn
+
+ 
+
+api使用速查：
+
+使用自定义函数递归遍历目录：
+filepath.WalkDir
