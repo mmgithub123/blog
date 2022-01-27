@@ -1,0 +1,677 @@
+程序启动的用户                    etcd
+程序systemd service文件     见下面
+主目录                                   etcd没有这个
+主目录/二进制                       三个二进制放在/usr/local/etcd
+主目录/配置                          配置在/etc/etcd.conf.yml         
+主目录/数据                          /var/lib/etcd
+主目录/日志                         
+动态库或插件
+ 
+
+install:
+
+1，安装脚本： （安装脚本可与2配置文件一起使用，做自动化静态集群部署）
+
+这里有一个问题是，如果直接用etcd用户启动etcd，在systemctl start etcd时，是没有权限创建/var/lib/etcd下面的各种数据文件的。
+
+所以，这里先用root启动起来，文件创建出来。然后停掉etcd service。再然后更改/var/lib/etcd的权限 chown -R etcd:etcd /var/lib/etcd，在编辑
+
+/usr/lib/systemd/system/etcd.service 加入User=etcd,Group=etcd ,再启动etcd service。
+
+#!/bin/sh
+
+groupadd etcd
+useradd -r -g etcd -s /sbin/nologin etcd
+wget https://mirrors.huaweicloud.com/etcd/v3.5.1/etcd-v3.5.1-linux-amd64.tar.gz
+tar -zxvf etcd-v3.5.1-linux-amd64.tar.gz
+mkdir -p /usr/local/etcd
+cd etcd-v3.5.1-linux-amd64
+cp etcd etcdctl etcdutl /usr/local/etcd
+chown -R etcd:etcd /usr/local/etcd
+
+sudo cat >>/etc/yum.repos.d/nginx.repo<<EOF
+[Unit]
+Description=etcd process
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/etcd/etcd --config-file /etc/etcd.conf.yml
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable etcd
+systemctl daemon-reload
+
+sudo cp etcd.conf.yml /etc
+systemctl start etcd
+systemctl status etcd
+
+systemctl stop etcd
+
+
+chown -R etcd:etcd /var/lib/etcd
+sudo cat >>/etc/yum.repos.d/nginx.repo<<EOF
+[Unit]
+Description=etcd process
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+
+User=etcd
+Group=etcd
+
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/etcd/etcd --config-file /etc/etcd.conf.yml
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+ 
+
+systemctl daemon-reload
+
+systemctl start etcd
+systemctl status etcd
+
+ 
+
+2，配置文件：
+
+# This is the configuration file for the etcd server.
+
+# Human-readable name for this member.
+name: 'etcd1'
+
+# Path to the data directory.
+data-dir: /var/lib/etcd
+
+# Path to the dedicated wal directory.
+wal-dir: /var/lib/etcd
+
+# Number of committed transactions to trigger a snapshot to disk.
+snapshot-count: 10000
+
+# Time (in milliseconds) of a heartbeat interval.
+heartbeat-interval: 100
+
+# Time (in milliseconds) for an election to timeout.
+election-timeout: 1000
+
+# Raise alarms when backend size exceeds the given quota. 0 means use the
+# default quota.
+quota-backend-bytes: 0
+
+# List of comma separated URLs to listen on for peer traffic.
+listen-peer-urls: http://192.168.:2380
+
+# List of comma separated URLs to listen on for client traffic.
+listen-client-urls: http://192.168:2379
+
+# Maximum number of snapshot files to retain (0 is unlimited).
+max-snapshots: 5
+
+# Maximum number of wal files to retain (0 is unlimited).
+max-wals: 5
+
+# Comma-separated white list of origins for CORS (cross-origin resource sharing).
+cors:
+
+# List of this member's peer URLs to advertise to the rest of the cluster.
+# The URLs needed to be a comma-separated list.
+initial-advertise-peer-urls: http://192.168:2380
+
+# List of this member's client URLs to advertise to the public.
+# The URLs needed to be a comma-separated list.
+advertise-client-urls: http://192.168:2379
+
+# Discovery URL used to bootstrap the cluster.
+discovery:
+
+# Valid values include 'exit', 'proxy'
+discovery-fallback: 'proxy'
+
+# HTTP proxy to use for traffic to discovery service.
+discovery-proxy:
+
+# DNS domain used to bootstrap initial cluster.
+discovery-srv:
+
+# Initial cluster configuration for bootstrapping.
+initial-cluster: etcd1=http://192.168.1:2380,etcd2=http://192.16:2380,etcd3=http://192.168.:2380
+
+# Initial cluster token for the etcd cluster during bootstrap.
+initial-cluster-token: 'etcd-cluster1'
+
+# Initial cluster state ('new' or 'existing').
+initial-cluster-state: 'new'
+
+# Reject reconfiguration requests that would cause quorum loss.
+strict-reconfig-check: false
+
+# Accept etcd V2 client requests
+enable-v2: true
+
+# Enable runtime profiling data via HTTP server
+enable-pprof: true
+
+# Valid values include 'on', 'readonly', 'off'
+proxy: 'off'
+
+# Time (in milliseconds) an endpoint will be held in a failed state.
+proxy-failure-wait: 5000
+
+# Time (in milliseconds) of the endpoints refresh interval.
+proxy-refresh-interval: 30000
+
+# Time (in milliseconds) for a dial to timeout.
+proxy-dial-timeout: 1000
+
+# Time (in milliseconds) for a write to timeout.
+proxy-write-timeout: 5000
+
+# Time (in milliseconds) for a read to timeout.
+proxy-read-timeout: 0
+
+client-transport-security:
+# Path to the client server TLS cert file.
+cert-file:
+
+# Path to the client server TLS key file.
+key-file:
+
+# Enable client cert authentication.
+client-cert-auth: false
+
+# Path to the client server TLS trusted CA cert file.
+trusted-ca-file:
+
+# Client TLS using generated certificates
+auto-tls: false
+
+peer-transport-security:
+# Path to the peer server TLS cert file.
+cert-file:
+
+# Path to the peer server TLS key file.
+key-file:
+
+# Enable peer client cert authentication.
+client-cert-auth: false
+
+# Path to the peer server TLS trusted CA cert file.
+trusted-ca-file:
+
+# Peer TLS using generated certificates.
+auto-tls: false
+
+# The validity period of the self-signed certificate, the unit is year.
+self-signed-cert-validity: 1
+
+# Enable debug-level logging for etcd.
+log-level: debug
+
+logger: zap
+
+# Specify 'stdout' or 'stderr' to skip journald logging even when running under systemd.
+log-outputs: [stderr]
+
+# Force to create a new one member cluster.
+force-new-cluster: false
+
+auto-compaction-mode: periodic
+auto-compaction-retention: "1"
+
+ 
+
+ 
+
+解释说明：
+
+创建etcd的用户和组：（创建service文件的时候需要使用）
+
+groupadd etcd
+
+useradd -r -g etcd -s /sbin/nologin etcd
+
+ 
+
+wget https://github.com/etcd-io/etcd/releases/download/v3.5.1/etcd-v3.5.1-linux-amd64.tar.gz
+
+或者国内华为镜像
+
+wget https://mirrors.huaweicloud.com/etcd/v3.5.1/etcd-v3.5.1-linux-amd64.tar.gz
+
+ 
+
+tar -zxvf etcd-v3.5.1-linux-amd64.tar.gz
+
+mkdir -p  /usr/local/etcd
+
+cd etcd-v3.5.1-linux-amd64
+
+cp etcd etcdctl etcdutl /usr/local/etcd
+
+ chown -R etcd:etcd /usr/local/etcd  （这里把二进制给与etcd用户？）
+ chown -R etcd:etcd /var/lib/etcd     (二进制程序给etcd用户和组，数据目录也给etcd用户和组)
+vi /usr/lib/systemd/system/etcd.service
+
+[Unit]
+Description=etcd process
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+
+User=etcd
+Group=etcd
+
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/etcd/etcd --config-file /etc/etcd.conf.yml
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable etcd
+
+ 
+
+systemc service:
+
+[Unit]
+
+这里有问题，没有after网络
+Description=etcd process
+
+[Service]
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/etcd/etcd --config-file /etc/etcd.conf.yml
+
+[Install]
+WantedBy=multi-user.target
+
+ 
+
+systemctl daemon-reload
+
+systemctl enable etcd
+
+systemctl start etcd
+
+systemctl status etcd
+
+/usr/local/etcd/etcd --version
+
+ 
+
+ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+使用：
+
+etcdctl --endpoints=ip地址:2379 put greeting "Hello, etcd"
+
+etcdctl --endpoints=IP地址:2379 get greeting
+
+ 
+
+管理：
+
+角色控制，就两步，一，root用户初始化。二，使用已初始化的root用户添加管理新用户
+
+etcdctl  --endpoints=ip:2379   user list     列出用户，如果没设置会为空
+
+etcdctl  --endpoints=ip:2379   member  list  列出集群成员 
+
+etcdctl --endpoints=ip:2379    role list          列出角色 如果没设置会为空。
+
+etcdctl --endpoints=:2379 role add root    添加一个root角色
+1008 etcdctl --endpoints=:2379 role list    可以看到root角色列出来
+1009 etcdctl --endpoints=:2379 user add root   添加一个root用户（这个必须最先做，要在开启角色控制之前，其实就是最开始的root用户初始化，和mysql一样）
+1011 etcdctl --endpoints=:2379 user grant-role root（用户名） root（角色名） 给某个用户加某个角色（root用户必须给root角色）
+1013 etcdctl --endpoints=:2379 auth status 查看访问控制状态，没开启会为false
+1014 etcdctl --endpoints=:2379 auth enable 开启授权，访问控制
+1016 etcdctl --endpoints=:2379 auth status  因为已经开启访问控制，没有指定用户名和密码，所有报错
+1017 etcdctl --endpoints=:2379 user list      因为已经开启访问控制，没有指定用户名和密码，所有报错
+
+etcdctl --endpoints=:2379 --user root user list   加了--user option，此时需要输入root密码，就可以看到用户列表
+
+etcdctl  --help
+
+etcdctl [flags]，flags其实就是[options] [commands]
+
+比如etcdctl --endpoints=ip:2379（--endpoints option） --user=root（--user options） user （etcdctl 的command）list（sub command，也就是user的command） 
+
+ 
+
+ 
+
+ 工作流：
+
+角色控制，就两步，一，root用户初始化。二，使用已初始化的root用户添加管理新用户
+
+/usr/local/etcd/etcdctl --endpoints=$ENDPOINTS  role add root 
+
+user add root  
+
+user grant-role root  root（角色名） 给某个用户加某个角色（root用户必须给root角色）
+
+auth enable
+
+--user root user list  
+
+ 
+
+创建一个app用户，etcdctl --endpoints=:2379 user add app
+
+一个app角色，role add app
+
+并把app用户和app角色绑定：user grant-role root  root
+
+在给app角色赋予以config开头的key的读写权限，
+
+ etcdctl --user=root --endpoints=ip:2379  role grant-permission app --prefix=true readwrite /config/
+
+ etcdctl  --endpoints=:2379  --user=root role get app   查看app角色被赋予了哪些权限。
+
+ 
+
+运行时配置：
+
+https://etcd.io/docs/v3.5/op-guide/runtime-configuration/
+
+ 
+
+ 
+
+ ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ 
+
+集群：
+
+几个url，两个节点间用的，两个对外客户端用的，这四个url都可以配置成逗号分割的列表形式：
+
+节点间2380，客户端2379
+
+--initial-advertise-peer-urls http://10.0.1.12:2380 \
+
+ --advertise-client-urls http://10.0.1.12:2379
+--listen-peer-urls http://10.0.1.12:2380 \ 
+--listen-client-urls http://10.0.1.12:2379,http://127.0.0.1:2379 \
+节点间服务发现url：initial-advertise-peer-urls。做静态集群初始化配置–initial-cluster 时需要使用：
+
+节点间心跳，数据同步url：listen-peer-urls
+
+因为etcd是无主对等分布式架构，所以有集群对外提供服务的监听url集合：advertise-client-urls
+
+单机监听客户端url：listen-client-urls
+
+ 
+
+ 
+
+集群配置：
+https://etcd.io/docs/v3.5/op-guide/clustering/
+ 
+–name
+Human-readable name for this member.
+default: “default”
+env variable: ETCD_NAME
+This value is referenced as this node’s own entries listed in the --initial-cluster flag (e.g., default=http://localhost:2380). This needs to match the key used in the flag if using static bootstrapping. When using discovery, each member must have a unique name. Hostname or machine-id can be a good choice
+名字标识或者说节点名，当使用静态方式搭建集群时，做为key
+–initial-cluster
+Initial cluster configuration for bootstrapping.
+default: “default=http://localhost:2380”
+env variable: ETCD_INITIAL_CLUSTER
+The key is the value of the --name flag for each node provided. The default uses default for the key because this is the default for the --name flag
+初始集群配置，这里的url要注意，Note that the URLs specified in initial-cluster are the advertised peer URLs, i.e. they should match the value of initial-advertise-peer-urls on the respective nodes.，是initial-advertise-peer-urls节点间服务发现url
+ 
+集群标识：
+initial-cluster-token  
+ 
+ 
+listen-client-urls
+etcd listens on listen-client-urls to accept client traffic。Multiple URLs may be used to specify a number of addresses and ports to listen on. The etcd will respond to requests from any of the listed addresses and ports.
+ 
+搭建三节点etcd集群：
+On each machine, start etcd with these flags:（也可以分别在配置文件里指定）
+
+$ etcd --name infra0（节点名） --initial-advertise-peer-urls http://10.0.1.10:2380（广播服务发现节点地址） \
+  --listen-peer-urls http://10.0.1.10:2380（节点间心跳数据同步等地址） \
+  --listen-client-urls http://10.0.1.10:2379,http://127.0.0.1:2379（） \
+  --advertise-client-urls http://10.0.1.10:2379（集群整体对外提供监听客户端地址列表广播客户端地址） \ 
+  --initial-cluster-token etcd-cluster-1（集群id名） \ --initial-cluster infra0=http://10.0.1.10:2380,infra1=http://10.0.1.11:2380,infra2=http://10.0.1.12:2380（集群静态成员列表） \
+ --initial-cluster-state new （初始化集群，Initial cluster state (“new” or “existing”). Set to new for all members present during initial static or DNS bootstrapping.） 
+$ etcd --name infra1 --initial-advertise-peer-urls http://10.0.1.11:2380 \
+  --listen-peer-urls http://10.0.1.11:2380 \
+  --listen-client-urls http://10.0.1.11:2379,http://127.0.0.1:2379 \
+  --advertise-client-urls http://10.0.1.11:2379 \
+  --initial-cluster-token etcd-cluster-1 \
+  --initial-cluster infra0=http://10.0.1.10:2380,infra1=http://10.0.1.11:2380,infra2=http://10.0.1.12:2380 \
+  --initial-cluster-state new
+$ etcd --name infra2 --initial-advertise-peer-urls http://10.0.1.12:2380 \
+  --listen-peer-urls http://10.0.1.12:2380 \
+  --listen-client-urls http://10.0.1.12:2379,http://127.0.0.1:2379 \
+  --advertise-client-urls http://10.0.1.12:2379 \
+  --initial-cluster-token etcd-cluster-1 \
+  --initial-cluster infra0=http://10.0.1.10:2380,infra1=http://10.0.1.11:2380,infra2=http://10.0.1.12:2380 \
+  --initial-cluster-state new
+ 
+查看集群成员：
+1，   vi /etc/profile  配置etcd环境变量
+#etcd
+export etcd_host1=192.168.
+export etcd_host2=192.168.6
+export etcd_host3=192.168.7
+ENDPOINTS=$etcd_host1:2379,$etcd_host2:2379,$etcd_host3:2379
+
+source /etc/profile
+
+ 
+
+2，放通防火墙：
+
+ansible etcd -m shell -a "firewall-cmd --zone=public --add-port=2380/tcp --permanent"
+
+ansible etcd -m shell -a "firewall-cmd --zone=public --add-port=2379/tcp --permanent"
+
+ansible etcd -m shell -a " firewall-cmd --reload"
+
+ 
+
+etcdctl --endpoints=$ENDPOINTS member list --write-out="table"
+ 
+etcdctl --endpoints=$ENDPOINTS endpoint status --write-out="table"
+
+etcdctl --endpoints=$ENDPOINTS endpoint health --write-out="table"
+
+节点上下线：
+etcdctl --endpoints=$ENDPOINTS member add|remove
+
+
+
+运行时配置：
+比如集群节点上下线
+https://etcd.io/docs/v3.5/op-guide/runtime-configuration/
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+etcd配置文件：
+配置文件参考：https://github.com/etcd-io/etcd/blob/release-3.4/etcd.conf.yml.sample
+ 
+-advertise-client-urls
+就是客户端(etcdctl/curl等)跟etcd服务进行交互时请求的url
+--listen-client-urls
+这个参数是etcd服务器自己监听时用的，也就是说，监听本机上的哪个网卡，哪个端口
+–log-level  日志级别
+Configures log level. Only supports debug, info, warn, error, panic, or fatal.
+default: info
+ 
+/etc/etcd.conf
+# This is the configuration file for the etcd server.
+ 	 
+ 	# Human-readable name for this member.
+ 	name: 'default'
+ 	 
+ 	# Path to the data directory.
+ 	data-dir:
+ 	 
+ 	# Path to the dedicated wal directory.
+ 	wal-dir:
+ 	 
+ 	# Number of committed transactions to trigger a snapshot to disk.
+ 	snapshot-count: 10000
+ 	 
+ 	# Time (in milliseconds) of a heartbeat interval.
+ 	heartbeat-interval: 100
+ 	 
+ 	# Time (in milliseconds) for an election to timeout.
+ 	election-timeout: 1000
+ 	 
+ 	# Raise alarms when backend size exceeds the given quota. 0 means use the
+ 	# default quota.
+ 	quota-backend-bytes: 0
+ 	 
+ 	# List of comma separated URLs to listen on for peer traffic.
+ 	listen-peer-urls: http://localhost:2380
+ 	 
+ 	# List of comma separated URLs to listen on for client traffic.
+ 	listen-client-urls: http://localhost:2379
+ 	 
+ 	# Maximum number of snapshot files to retain (0 is unlimited).
+ 	max-snapshots: 5
+ 	 
+ 	# Maximum number of wal files to retain (0 is unlimited).
+ 	max-wals: 5
+ 	 
+ 	# Comma-separated white list of origins for CORS (cross-origin resource sharing).
+ 	cors:
+ 	 
+ 	# List of this member's peer URLs to advertise to the rest of the cluster.
+ 	# The URLs needed to be a comma-separated list.
+ 	initial-advertise-peer-urls: http://localhost:2380
+ 	 
+ 	# List of this member's client URLs to advertise to the public.
+ 	# The URLs needed to be a comma-separated list.
+ 	advertise-client-urls: http://localhost:2379
+ 	 
+ 	# Discovery URL used to bootstrap the cluster.
+ 	discovery:
+ 	 
+ 	# Valid values include 'exit', 'proxy'
+ 	discovery-fallback: 'proxy'
+ 	 
+ 	# HTTP proxy to use for traffic to discovery service.
+ 	discovery-proxy:
+ 	 
+ 	# DNS domain used to bootstrap initial cluster.
+ 	discovery-srv:
+ 	 
+ 	# Initial cluster configuration for bootstrapping.
+ 	initial-cluster:
+ 	 
+ 	# Initial cluster token for the etcd cluster during bootstrap.
+ 	initial-cluster-token: 'etcd-cluster'
+ 	 
+ 	# Initial cluster state ('new' or 'existing').
+ 	initial-cluster-state: 'new'
+ 	 
+ 	# Reject reconfiguration requests that would cause quorum loss.
+ 	strict-reconfig-check: false
+ 	 
+ 	# Accept etcd V2 client requests
+ 	enable-v2: true
+ 	 
+ 	# Enable runtime profiling data via HTTP server
+ 	enable-pprof: true
+ 	 
+ 	# Valid values include 'on', 'readonly', 'off'
+ 	proxy: 'off'
+ 	 
+ 	# Time (in milliseconds) an endpoint will be held in a failed state.
+ 	proxy-failure-wait: 5000
+ 	 
+ 	# Time (in milliseconds) of the endpoints refresh interval.
+ 	proxy-refresh-interval: 30000
+ 	 
+ 	# Time (in milliseconds) for a dial to timeout.
+ 	proxy-dial-timeout: 1000
+ 	 
+ 	# Time (in milliseconds) for a write to timeout.
+ 	proxy-write-timeout: 5000
+ 	 
+ 	# Time (in milliseconds) for a read to timeout.
+ 	proxy-read-timeout: 0
+ 	 
+ 	client-transport-security:
+ 	# Path to the client server TLS cert file.
+ 	cert-file:
+ 	 
+ 	# Path to the client server TLS key file.
+ 	key-file:
+ 	 
+ 	# Enable client cert authentication.
+ 	client-cert-auth: false
+ 	 
+ 	# Path to the client server TLS trusted CA cert file.
+ 	trusted-ca-file:
+ 	 
+ 	# Client TLS using generated certificates
+ 	auto-tls: false
+ 	 
+ 	peer-transport-security:
+ 	# Path to the peer server TLS cert file.
+ 	cert-file:
+ 	 
+ 	# Path to the peer server TLS key file.
+ 	key-file:
+ 	 
+ 	# Enable peer client cert authentication.
+ 	client-cert-auth: false
+ 	 
+ 	# Path to the peer server TLS trusted CA cert file.
+ 	trusted-ca-file:
+ 	 
+ 	# Peer TLS using generated certificates.
+ 	auto-tls: false
+ 	 
+ 	# The validity period of the self-signed certificate, the unit is year.
+ 	self-signed-cert-validity: 1
+ 	 
+ 	# Enable debug-level logging for etcd.
+ 	log-level: debug
+ 	 
+ 	logger: zap
+ 	 
+ 	# Specify 'stdout' or 'stderr' to skip journald logging even when running under systemd.
+ 	log-outputs: [stderr]
+ 	 
+ 	# Force to create a new one member cluster.
+ 	force-new-cluster: false
+ 	 
+ 	auto-compaction-mode: periodic
+ 	
+auto-compaction-retention: "1"
+
+ 
+
+ 
+
+etcd --config-file  /etc/etcd.conf
+
+ ------------------------------------------------------------------------
+
+使用：
+
+etcdctl --endpoints=ip地址:2379 put greeting "Hello, etcd"
+
+etcdctl --endpoints=IP地址:2379 get greeting
