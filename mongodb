@@ -1,0 +1,676 @@
+install:
+
+5.0版本安装
+
+https://docs.mongodb.com/manual/tutorial/install-mongodb-on-red-hat/
+
+ 
+
+3.4版本安装：
+
+https://docs.mongodb.com/v3.4/tutorial/install-mongodb-on-red-hat/
+
+3.4版本 yum源没有了，用tar包安装：
+
+sudo groupadd mongod
+
+sudo useradd -r -g mongod -s /sbin/nologin mongod
+
+curl -O https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.4.24.tgz
+
+tar -zxvf mongodb-linux-x86_64-3.4.24.tgz
+
+cd mongodb-linux-x86_64-3.4.24
+
+mkdir -p /usr/local/mongodb/
+sudo cp -R bin /usr/local/mongodb/
+
+echo -e "#mongodb\nexport PATH=/usr/local/mongodb//bin:$PATH">>/etc/profile
+
+vi /etc/profile
+
+export PATH=/usr/local/mongodb//bin:$PATH
+source  /etc/profile
+
+mkdir -p /var/lib/mongo
+
+mkdir -p /var/log/mongodb
+
+chown -R mongod:mongod /var/lib/mongo
+
+ chown -R mongod:mongod /var/log/mongodb
+
+ 
+
+ 
+
+/etc/mongod.conf  3.4配置文件：
+
+# mongod.conf
+
+# for documentation of all options, see:
+# http://docs.mongodb.org/manual/reference/configuration-options/
+
+# where to write logging data.
+systemLog:
+destination: file
+logAppend: true
+path: /var/log/mongodb/mongod.log
+
+# Where and how to store data.
+storage:
+dbPath: /var/lib/mongo
+journal:
+enabled: true
+# engine:
+# wiredTiger:
+
+
+# network interfaces
+net:
+port: 27017
+bindIp: 127.0.0.1 # Enter 0.0.0.0,:: to bind to all IPv4 and IPv6 addresses or, alternatively, use the net.bindIpAll setting.
+
+
+security:
+authorization: enabled
+
+#operationProfiling:
+
+#replication:
+
+#sharding:
+
+## Enterprise-Only Options
+
+#auditLog:
+
+#snmp:
+
+ 
+
+ 
+
+systemd service文件：
+
+这样写是有问题的，其实每一个样例都不是随便写的，每行都有含义。
+
+故障案例：
+
+服务器重启了，但设定了systemctl enable mongod 但mongo还是没有自动和机器重启，
+
+systemd日志报：
+
+ ExecStart=/usr/local/mongodb/bin/mongod -f /etc/mongod.conf (code=exited, status=48)
+
+status 48
+
+mongo日志报：failed Cannot assign requested address for socket
+
+明显看是网络问题，而之前配置文件配置的就是本机ip，配置是没问题的，想到重启过，那就是启动的时候网络没准备好，
+
+那明显就是mongod.service 没有依赖网络，打开看mongod.service果然是，加上依赖就可以了：
+
+After=network-online.target
+
+Wants=network-online.target
+
+ 
+
+ 
+
+# /usr/lib/systemd/system/mongod.service
+[Unit]
+Description=mongod process
+
+[Service]
+User=mongod
+Group=mongod
+ExecStart=/usr/local/mongodb/bin/mongod -f /etc/mongod.conf
+ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
+ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
+ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
+PermissionsStartOnly=true
+PIDFile=/var/run/mongodb/mongod.pid
+#Type=forking
+# file size
+LimitFSIZE=infinity
+# cpu time
+LimitCPU=infinity
+# virtual memory size
+LimitAS=infinity
+# open files
+LimitNOFILE=64000
+# processes/threads
+LimitNPROC=64000
+# locked memory
+LimitMEMLOCK=infinity
+# total threads (user+kernel)
+TasksMax=infinity
+TasksAccounting=false
+# Recommended limits for mongod as specified in
+# https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
+
+
+[Install]
+WantedBy=multi-user.target
+
+ 
+
+systemctl start mongod
+
+ 
+
+ 
+
+报错：mongod.service start operation timed out. Terminating.
+
+因为service里是forking类型，而配置文件/etc/mongo.conf没有指定processManagement相关
+
+processManagement:
+  fork: true # fork and run in background
+  pidFilePath: /var/run/mongodb/mongod.pid # location of pidfile
+   timeZoneInfo: /usr/share/zoneinfo 
+
+ 
+
+解决方法，可以改成service type  simple类型，讨论见：https://groups.google.com/g/mongodb-user/c/unM76sZaDEQ
+
+This is because you have not specified that MongoDB should fork in your config file. Our systemd service file for RPM distress Type=forking for backwards compatibility reasons that Deb based distros did not have. You can fix your problem one of two ways:
+ 
+Remove the Type=forking from the systemd service file. You can do this by using sudo systemctl edit mongod which will create an override service file in /etc/systemd/system.
+ 
+Or you can add this to your config file:
+-------------------------------------------------------------------------------------------------------------------------------
+ 
+
+If you installed by downloading the tarballs,
+
+The default MongoDB directories are not created. To create the MongoDB data and log directories:
+
+Depending on your user permission, you may need to use sudo to perform these operations.
+
+mkdir -p /var/lib/mongo
+mkdir -p /var/log/mongodb
+By default, MongoDB runs using the mongod user account. Once created, set the owner and group of these directories to mongod:
+
+chown -R mongod:mongod <directory>
+------------------------------------------------------------------------------------------------------
+
+ 
+
+脚本里注意$的转义
+
+ 
+
+sudo touch /etc/yum.repos.d/mongodb-org-5.0.repo
+
+sudo chmod 666 /etc/yum.repos.d/mongodb-org-5.0.repo
+
+sudo cat >>/etc/yum.repos.d/mongodb-org-5.0.repo<<EOF
+[mongodb-org-5.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/\$releasever/mongodb-org/5.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-5.0.asc
+EOF
+
+sudo yum install -y mongodb-org
+
+sudo systemctl start mongod
+
+ 
+
+By default, MongoDB runs using the mongod user account and uses the following default directories:
+
+/var/lib/mongo (the data directory)
+/var/log/mongodb (the log directory)
+➤ If you installed via the package manager,
+The default directories are created, and the owner and group for these directories are set to mongod.
+systemctl start mongod
+Verify that MongoDB has started successfully
+You can verify that the mongod process has started successfully by checking the contents of the log file at /var/log/mongodb/mongod.log for a line reading
+
+ 
+[initandlisten] waiting for connections on port <port>
+where <port> is the port configured in /etc/mongod.conf, 27017 by default.
+
+ 
+
+systemd mongod service:
+
+[Unit]
+Description=MongoDB Database Server
+Documentation=https://docs.mongodb.org/manual
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mongod
+Group=mongod
+Environment="OPTIONS=-f /etc/mongod.conf"
+EnvironmentFile=-/etc/sysconfig/mongod
+ExecStart=/usr/bin/mongod $OPTIONS
+ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
+ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
+ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
+PermissionsStartOnly=true
+PIDFile=/var/run/mongodb/mongod.pid
+Type=forking
+# file size
+LimitFSIZE=infinity
+# cpu time
+LimitCPU=infinity
+# virtual memory size
+LimitAS=infinity
+# open files
+LimitNOFILE=64000
+# processes/threads
+LimitNPROC=64000
+# locked memory
+LimitMEMLOCK=infinity
+# total threads (user+kernel)
+TasksMax=infinity
+TasksAccounting=false
+# Recommended limits for mongod as specified in
+# https://docs.mongodb.com/manual/reference/ulimit/#recommended-ulimit-settings
+
+[Install]
+WantedBy=multi-user.target
+
+ 
+
+/etc/mongod.conf 配置文件：
+
+# mongod.conf
+
+# for documentation of all options, see:
+# http://docs.mongodb.org/manual/reference/configuration-options/
+
+# where to write logging data.
+systemLog:
+destination: file
+logAppend: true
+path: /var/log/mongodb/mongod.log
+
+# Where and how to store data.
+storage:
+dbPath: /var/lib/mongo
+journal:
+enabled: true
+# engine:
+# wiredTiger:
+
+# how the process runs
+processManagement:
+fork: true # fork and run in background
+pidFilePath: /var/run/mongodb/mongod.pid # location of pidfile
+timeZoneInfo: /usr/share/zoneinfo
+
+# network interfaces
+net:
+port: 27017
+bindIp: 127.0.0.1 # Enter 0.0.0.0,:: to bind to all IPv4 and IPv6 addresses or, alternatively, use the net.bindIpAll setting.
+
+
+#security:
+
+#operationProfiling:
+
+#replication:
+
+#sharding:
+
+## Enterprise-Only Options
+
+#auditLog:
+
+#snmp:
+
+ 
+
+ 
+
+验证安装成功：
+
+mongosh
+
+ ------------------------------------------------------------------------------------------------------
+
+管理：
+
+创建root用户
+
+use admin
+
+db.createUser({user:"admin",pwd:"",roles:[{ role:"root", db:"admin" } ] })
+ db.createUser({user:'testuser',pwd:'',roles:['readWrite']})
+
+ 
+
+云上mongodb管理：
+
+mongo mongodb://root:密码@ip1,ip2/admin?replicaSet=b-sdw(副本集)
+
+ use cloudscan;  创建cloudscan库
+
+db.createUser({user:"cloudscan",pwd:"密码",roles:[{role:"readWrite",db:"cloudscan"}]})  创建指定库的程序用户
+
+ 
+
+ 
+
+ 
+
+所有内置的角色：
+
+https://docs.mongodb.com/manual/reference/built-in-roles/    里面有相应角色的详情描述
+
+数据库用户角色（Database User Roles）：
+
+read：授予User只读数据的权限
+readWrite：授予User读写数据的权限
+数据库管理角色（Database Administration Roles）：
+
+dbAdmin：在当前dB中执行管理操作
+dbOwner：在当前DB中执行任意操作
+userAdmin：在当前DB中管理User
+备份和还原角色（Backup and Restoration Roles）：
+
+backup
+restore
+跨库角色（All-Database Roles）：
+
+readAnyDatabase：授予在所有数据库上读取数据的权限
+readWriteAnyDatabase：授予在所有数据库上读写数据的权限
+userAdminAnyDatabase：授予在所有数据库上管理User的权限
+dbAdminAnyDatabase：授予管理所有数据库的权限
+集群管理角色（Cluster Administration Roles）：
+
+clusterAdmin：授予管理集群的最高权限
+clusterManager：授予管理和监控集群的权限，A user with this role can access the config and local databases, which are used in sharding and replication, respectively.
+clusterMonitor：授予监控集群的权限，对监控工具具有readonly的权限
+hostManager：管理Server
+ 
+
+ 
+
+登录：
+
+mongo --host ip --port 27017 -u "admin" -p "" --authenticationDatabase "admin"
+
+ 
+
+To display the database you are using, type db:
+ 	db
+ 	 
+ 	To list the databases available to the user, use the helper
+ 	show dbs.
+ 	 
+ 	use DATABASE_NAME
+ 	如果数据库不存在，则创建数据库，否则切换到指定数据库。
+ 	 
+ 	删除数据库
+ 	在想要删除的库下执行 db.dropDatabase() 也就是
+ 	先 use test
+ 	然后 db.dropDatabase()
+ 	 
+ 	创建集合：
+ 	Create a Collection
+ 	If a collection does not exist, MongoDB creates the collection when you first store data for that collection.
+ 	 
+ 	列出所有集合
+ 	show collections
+ 	 
+ 	查询所有文档
+ 	db.allWxId.find()
+ 	 
+ 	管理;
+ 	systemctl stop mongod 关闭
+ 	systemctl start mongod 启动
+ 	 
+ 	db.createUser(
+ 	... {user:"admin",
+ 	... customData:{description:"superuser"},
+ 	... pwd:"",
+ 	... roles:[{role:"userAdminAnyDatabase", db:"admin"}]
+ 	... }
+ 	... )
+ 	 
+ 	db.createUser(
+ 	... {
+ 	... user:"op",
+ 	... pwd:"",
+ 	... customData:{description:"for data action"},
+ 	... roles:[
+ 	... {role:"readWrite",db:"docs_hu_jing"}
+ 	... ]
+ 	... })
+ --------------------------------------------------------------------------------------------------------------
+
+开发：
+
+使用：
+ 	理解object id 不是一个字符串
+ 	 
+ 	MongoDB stores data in bson format，bson strings are utf-8 encodeed
+ 	 
+ 	mongodb is schema-free
+ 	 
+ 	 
+ 	命令：
+ 	 
+ 	登录：
+ 	mongo hostname/pull -u rice -p rice --authenticationDatabase pull
+ 	mongo -u rice -p rice --port 27017 --authenticationDatabase pull （注意authenticationDatabase的概念）
+ 	mongo mongodb://user:password@ip:27017/
+ 	 
+ 	 
+ 	db.shenwan_industry.drop() 删除集合
+ 	db.swIndustryAshare_old.find() 列集合所有文档
+ 	db.swIndustryAshare_old.find().count() 集合中所有文档计数
+ 	 
+ 	--------------------------------------------------------------------------------------------------------------------------------
+ 	查询例子：
+ 	 
+ 	模糊查询：
+ 	db.collection.find({name:{$regex:/j*k/,$options:"si"}})
+ 	 
+ 	or查询
+ 	db.collection_name.find({"date" : ISODate("2016-12-28T00:00:00Z"), $or:[{"index_code":/^80/},{"index_code":/^85/}]}, {"index_code": 1})
+ 	like sql: select index_code from collection_name where date = "2016-12-28 00:00:00" and index_code = 80 or index_code = 85;
+ 	 
+ 	and查询
+ 	db.inventory.find( { $and: [ { price: { $ne: 1.99 } }, { price: { $exists: true } } ] } )
+ 	 
+ 	去重查询
+ 	$group 操作符
+ 	$加字段名 做field path
+ 	db.collection.aggregate([{'$group' :{'_id': {"ThirdIndustryCode": '$ThirdIndustryCode', "ThirdIndustryName": "$ThirdIndustryName"}}
+ 	}]):
+ 	 
+ 	$eq 等值查询
+ 	$ne 不等于查询
+ 	$lt 小于查询
+ 	$lte 小于等于
+ 	$gt 大于
+ 	$gte 大于等于
+ 	 
+ 	$in in查询
+ 	example：
+ 	{ _id: 1, item: "abc", qty: 10, tags: [ "school", "clothing" ], sale: false }
+ 	 
+ 	Then, the following update() operation will set the sale field value to true where the tags field holds an array with at least
+ 	one element matching either "appliances" or "school".
+ 	 
+ 	db.inventory.update(
+ 	{ tags: { $in: ["appliances", "school"] } },
+ 	{ $set: { sale:true } }
+ 	)
+ 	 
+ 	$nin not in 查询
+ 	$or or查询
+ 	 
+ 	 
+ 	$exists mongodb里判断列是否存在，因为mongodb时schema free，所以不是每个行都有一样的列。这个$exists与sql里的exists要注意对比，sql里的exists是
+ 	至少会返回一行数据，就是说判断是否有一行数据存在。
+ 	 
+ 	比如在Northwind数据库中有一个查询为
+ 	SELECT c.CustomerId,CompanyName FROM Customers c
+ 	WHERE EXISTS(
+ 	SELECT OrderID FROM Orders o WHERE o.CustomerID=c.CustomerID)
+ 	这里面的EXISTS是如何运作呢？子查询返回的是OrderId字段，可是外面的查询要找的是CustomerID和CompanyName字段，这两个字段肯定不在OrderID里面啊，
+ 	这是如何匹配的呢？
+ 	EXISTS用于检查子查询是否至少会返回一行数据，该子查询实际上并不返回任何数据，而是返回值True或False
+ 	 
+ 	db.inventory.find( { qty: { $exists: true, $nin: [ 5, 15 ] } } )
+ 	This query will select all documents in the inventory collection where the qty field exists and its value does not equal 5 or 15.
+ 	 
+ 	匹配字段是否是某个类型：
+ 	$type selects the documents where the value of the field is an instance of the specified BSON type(s). Querying by data type is
+ 	useful when dealing with highly unstructured data where data types are not predictable.
+ 	 
+ 	db.addressBook.find( { "zipCode" : { $type : 1 } } )
+ 	db.addressBook.find( { "zipCode" : { $type : "double" } } )
+ 	db.addressBook.find( { "zipCode" : { $type : 2 } } );
+ 	db.addressBook.find( { "zipCode" : { $type : "string" } } );
+ 	the detail list ：https://docs.mongodb.com/manual/reference/operator/query/type/#document-querying-by-data-type
+ 	 
+ 	复合查询列子：
+ 	db.swIndustryAshare_new.find( {"CancelDate" :{$not: { $type : 10 } } }, {"CancelDate": 1, "_id": 0, "ThirdIndustryName": 1} ).sort({"CancelDate": -1})
+ 	取出CancelDate 不为空，按CancelDate排序
+ 	 
+ 	mongo_filter = {'FirstIndustryIndxCode': index_code, 'InfoPubDate': {'$lt': date}, '$or':[{"CancelDate":{ '$type' : 10 }},{"CancelDate":{'$gt': date}}]}
+ 	取出
+ 	FirstIndustryIndxCode = index_code and InfoPubDate < date and CancelDate is null or CancelDate > date
+ 	 
+ 	 
+ 	 
+ 	 
+ 	索引：
+ 	查看索引
+ 	MongoDB提供了查看索引信息的方法：
+ 	getIndexes()方法可以用来查看集合的所有索引，
+ 	totalIndexSize()查看集合索引的总大小，
+ 	db.system.indexes.find()查看数据库中所有索引信息。
+ 	 
+ 	创建索引语法结构
+ 	db.COLLECTION_NAME.ensureIndex(keys[,options])
+ 	keys，要建立索引的参数列表。如：{KEY:1}，其中key表示字段名，1表示升序排序，也可使用使用数字-1降序。
+ 	options，可选参数，表示建立索引的设置。可选值如下：
+ 	background，Boolean，在后台建立索引，以便建立索引时不阻止其他数据库活动。默认值 false。
+ 	unique，Boolean，创建唯一索引。默认值 false。
+ 	name，String，指定索引的名称。如果未指定，MongoDB会生成一个索引字段的名称和排序顺序串联。
+ 	dropDups，Boolean，创建唯一索引时，如果出现重复删除后续出现的相同索引，只保留第一个。
+ 	sparse，Boolean，对文档中不存在的字段数据不启用索引。默认值是 false。
+ 	v，index version，索引的版本号。
+ 	weights，document，索引权重值，数值在 1 到 99,999 之间，表示该索引相对于其他索引字段的得分权重。
+ 	 
+ 	为集合sites建立索引：
+ 	> db.sites.ensureIndex({name: 1, domain: -1})
+ 	 
+ 	删除集合sites中名为"name_1_domain_-1"的索引：
+ 	> db.sites.dropIndex("name_1_domain_-1")
+ 	 
+ 	删除集合sites中所有的索引：
+ 	> db.sites.dropIndexes()
+ 	 
+ 	 
+ 	 
+ 	为了方便mongodb里存时间 最好统一用字符串类型
+ 	 
+ 	 
+ 	-------------------------------------------------------------------------------------------
+ 	数据格式：
+ 	db.swIndustryAshare_old.find()
+ 	{ "_id" : ObjectId("5a783ec61a46134c6de2deb3"), "SecondIndustryIndxCode" : "801164.INDX", "SecondIndustryName" : "水务", "FirstIndustryCode" : "410000", "InfoPubDate" : ISODate("2004-04-01T00:00:00Z"), "FirstIndustryName" : "公用事业", "CancelDate" : null, "ThirdIndustryIndxCode" : "851621.INDX", "ThirdIndustryCode" : "410201", "ModifiedTime" : ISODate("2017-09-01T22:21:14Z"), "UpdateTime" : "2018-02-05 19:23:45", "SecondIndustryCode" : "410200", "ThirdIndustryName" : "水务", "STOCKCODE" : "600008.XSHG", "FirstIndustryIndxCode" : "801160.INDX" }
+ 	{ "_id" : ObjectId("5a783ec61a46134c6de2deb4"), "SecondIndustryIndxCode" : "801174.INDX", "SecondIndustryName" : "机场", "FirstIndustryCode" : "420000", "InfoPubDate" : ISODate("1998-02-18T00:00:00Z"), "FirstIndustryName" : "交通运输", "CancelDate" : null, "ThirdIndustryIndxCode" : "851751.INDX", "ThirdIndustryCode" : "420501", "ModifiedTime" : ISODate("2017-09-01T22:21:14Z"), "UpdateTime" : "2018-02-05 19:23:45", "SecondIndustryCode" : "420500", "ThirdIndustryName" : "机场", "STOCKCODE" : "600009.XSHG", "FirstIndustryIndxCode" : "801170.INDX" }
+ 	{ "_id" : ObjectId("5a783ec61a46134c6de2deb5"), "SecondIndustryIndxCode" : "801041.INDX", "SecondIndustryName" : "钢铁", "FirstIndustryCode" : "230000", "InfoPubDate" : ISODate("2001-02-22T00:00:00Z"), "FirstIndustryName" : "黑色金属", "CancelDate" : null, "ThirdIndustryIndxCode" : "850411.INDX", "ThirdIndustryCode" : "230101", "ModifiedTime" : ISODate("2017-09-01T22:21:14Z"), "UpdateTime" : "2018-02-05 19:23:45", "SecondIndustryCode" : "230100", "ThirdIndustryName" : "普钢", "STOCKCODE" : "600010.XSHG", "FirstIndustryIndxCode" : "801040.INDX" }
+ 	{ "_id" : ObjectId("5a783ec61a46134c6de2deb6"), "SecondIndustryIndxCode" : "801161.INDX", "SecondIndustryName" : "电力", "FirstIndustryCode" : "410000", "InfoPubDate" : ISODate("2001-12-06T00:00:00Z"), "FirstIndustryName" : "公用事业", "CancelDate" : null, "ThirdIndustryIndxCode" : "851611.INDX", "ThirdIndustryCode" : "410101", "ModifiedTime" : ISODate("2017-09-01T22:21:14Z"), "UpdateTime" : "2018-02-05 19:23:45", "SecondIndustryCode" : "410100", "ThirdIndustryName" : "火电", "STOCKCODE" : "600011.XSHG", "FirstIndustryIndxCode" : "801160.INDX" }
+ 	{ "_id" : ObjectId("5a783ec61a46134c6de2deb7"), "SecondIndustryIndxCode" : "801175.INDX", "SecondIndustryName" : "高速公路", "FirstIndustryCode" : "420000", "InfoPubDate" : ISODate("2003-01-07T00:00:00Z"), "FirstIndustryName" : "交通运输", "CancelDate" : null, "ThirdIndustryIndxCode" : "851731.INDX", "ThirdIndustryCode" : "420201", "ModifiedTime" : ISODate("2017-09-01T22:21:14Z"), "UpdateTime" : "2018-02-05 19:23:45", "SecondIndustryCode" : "420200", "ThirdIndustryName" : "高速公路", "STOCKCODE" : "600012.XSHG", "FirstIndustryIndxCode" : "801170.INDX" }
+ 	 
+ 	db.swIndustryAshare_new.find()
+ 	{ "_id" : ObjectId("5a783ee31a46134c89058780"), "FirstIndustryIndxCode" : "801160.INDX", "FirstIndustryCode" : "410000", "SecondIndustryIndxCode" : "801161.INDX", "STOCKCODE" : "600021.XSHG", "SecondIndustryCode" : "410100", "InfoPubDate" : ISODate("2014-01-01T00:00:00Z"), "UpdateTime" : "2018-02-05 19:24:14", "ModifiedTime" : ISODate("2014-01-06T06:51:10Z"), "SecondIndustryName" : "电力", "ThirdIndustryCode" : "410101", "ThirdIndustryName" : "火电", "FirstIndustryName" : "公用事业", "ThirdIndustryIndxCode" : "851611.INDX", "CancelDate" : null }
+ 	{ "_id" : ObjectId("5a783ee31a46134c89058781"), "FirstIndustryIndxCode" : "801170.INDX", "FirstIndustryCode" : "420000", "SecondIndustryIndxCode" : "801176.INDX", "STOCKCODE" : "600026.XSHG", "SecondIndustryCode" : "420600", "InfoPubDate" : ISODate("2014-01-01T00:00:00Z"), "UpdateTime" : "2018-02-05 19:24:14", "ModifiedTime" : ISODate("2014-01-06T06:51:10Z"), "SecondIndustryName" : "航运", "ThirdIndustryCode" : "420601", "ThirdIndustryName" : "航运", "FirstIndustryName" : "交通运输", "ThirdIndustryIndxCode" : "851761.INDX", "CancelDate" : null }
+ 	{ "_id" : ObjectId("5a783ee31a46134c89058782"), "FirstIndustryIndxCode" : "801030.INDX", "FirstIndustryCode" : "220000", "SecondIndustryIndxCode" : "801035.INDX", "STOCKCODE" : "600028.XSHG", "SecondIndustryCode" : "220100", "InfoPubDate" : ISODate("2014-01-01T00:00:00Z"), "UpdateTime" : "2018-02-05 19:24:14", "ModifiedTime" : ISODate("2014-01-06T06:51:10Z"), "SecondIndustryName" : "石油化工", "ThirdIndustryCode" : "220101", "ThirdIndustryName" : "石油加工", "FirstIndustryName" : "化工", "ThirdIndustryIndxCode" : "850311.INDX", "CancelDate" : null }
+ 	{ "_id" : ObjectId("5a783ee31a46134c89058783"), "FirstIndustryIndxCode" : "801170.INDX", "FirstIndustryCode" : "420000", "SecondIndustryIndxCode" : "801173.INDX", "STOCKCODE" : "600029.XSHG", "SecondIndustryCode" : "420400", "InfoPubDate" : ISODate("2014-01-01T00:00:00Z"), "UpdateTime" : "2018-02-05 19:24:14", "ModifiedTime" : ISODate("2014-01-06T06:51:10Z"), "SecondIndustryName" : "航空运输", "ThirdIndustryCode" : "420401", "ThirdIndustryName" : "航空运输", "FirstIndustryName" : "交通运输", "ThirdIndustryIndxCode" : "851741.INDX", "CancelDate" : null }
+ 	 
+ 	db.index_comp_weights.find()
+ 	{ "_id" : ObjectId("5a796a351a4613450be9ab9a"), "index_code" : "801091", "data" : [ { "order_book_id" : "000017.XSHG", "weight" : 0.374476 }, { "order_book_id" : "000913.XSHG", "weight" : 0.599493 }, { "order_book_id" : "600099.XSHG", "weight" : 0.49521 }, { "order_book_id" : "600262.XSHG", "weight" : 0.675664 }, { "order_book_id" : "600391.XSHG", "weight" : 0.778577 }, { "order_book_id" : "600677.XSHG", "weight" : 1.431703 }, { "order_book_id" : "600877.XSHG", "weight" : 1.575762 }, { "order_book_id" : "600990.XSHG", "weight" : 0.625353 }, { "order_book_id" : "002297.XSHG", "weight" : 0.911299 }, { "order_book_id" : "300101.XSHG", "weight" : 1.931439 }, { "order_book_id" : "001696.XSHG", "weight" : 2.540014 }, { "order_book_id" : "000920.XSHG", "weight" : 1.145803 }, { "order_book_id" : "600118.XSHG", "weight" : 5.180625 }, { "order_book_id" : "600316.XSHG", "weight" : 4.641692 }, { "order_book_id" : "600435.XSHG", "weight" : 2.042912 }, { "order_book_id" : "600685.XSHG", "weight" : 2.257974 }, { "order_book_id" : "600879.XSHG", "weight" : 3.691532 }, { "order_book_id" : "002105.XSHG", "weight" : 0.377117 }, { "order_book_id" : "601989.XSHG", "weight" : 12.372957 }, { "order_book_id" : "300123.XSHG", "weight" : 0.57191 }, { "order_book_id" : "000738.XSHG", "weight" : 0.915396 }, { "order_book_id" : "600038.XSHG", "weight" : 1.800627 }, { "order_book_id" : "600150.XSHG", "weight" : 5.197136 }, { "order_book_id" : "600343.XSHG", "weight" : 1.010804 }, { "order_book_id" : "600495.XSHG", "weight" : 1.564596 }, { "order_book_id" : "600698.XSHG", "weight" : 1.077125 }, { "order_book_id" : "600893.XSHG", "weight" : 5.109605 }, { "order_book_id" : "002151.XSHG", "weight" : 1.138835 }, { "order_book_id" : "601299.XSHG", "weight" : 8.004489 }, { "order_book_id" : "601890.XSHG", "weight" : 1.74521 }, { "order_book_id" : "000768.XSHG", "weight" : 5.774033 }, { "order_book_id" : "600072.XSHG", "weight" : 3.316257 }, { "order_book_id" : "600184.XSHG", "weight" : 1.136315 }, { "order_book_id" : "600372.XSHG", "weight" : 3.035131 }, { "order_book_id" : "600523.XSHG", "weight" : 0.964948 }, { "order_book_id" : "600760.XSHG", "weight" : 1.676058 }, { "order_book_id" : "600967.XSHG", "weight" : 1.458572 }, { "order_book_id" : "601766.XSHG", "weight" : 9.704809 }, { "order_book_id" : "300008.XSHG", "weight" : 0.555329 }, { "order_book_id" : "002608.XSHG", "weight" : 0.593212 } ], "date" : "2012-01-01 00:00:00" }
+ 
+------------------------------------------------------------------------------------------------------------------------
+
+备份：
+
+https://docs.mongodb.com/manual/core/backups/
+
+ 
+
+物理备份基于文件系统快照：
+
+https://docs.mongodb.com/manual/tutorial/backup-with-filesystem-snapshots/
+
+https://docs.mongodb.com/manual/tutorial/backup-sharded-cluster-with-filesystem-snapshots/
+
+ 
+
+逻辑备份
+
+基于mongodump：
+
+https://docs.mongodb.com/manual/tutorial/backup-and-restore-tools/
+
+https://docs.mongodb.com/manual/tutorial/backup-sharded-cluster-with-database-dumps/
+
+ 
+
+ 
+
+---------------------------------------------------------------------------------------------------------------------------
+
+搭建分片集群和启用分片是前后两个步骤，搭建分片集群是基础，启用分片才真正开始均衡分片的数据分布。步骤包括：
+
+1、启动mongos；
+
+2、使用客户端mongo连接到mongos；
+
+3、使用sh.addShard注册分片，方法参见：
+
+http://docs.mongodb.org/manual/reference/method/sh.addShard/
+
+4、使用sh.enableSharding启用某个库的分片功能，方法参见：
+
+http://docs.mongodb.org/manual/reference/method/sh.enableSharding/
+
+5、使用sh.shardCollection均衡某个集合的数据分布，注意选择合理的片键，方法 参见：
+
+http://docs.mongodb.org/manual/reference/method/sh.shardCollection/
+
+6、使用sh.status查看集合的数据分布，方法参见：
+
+http://docs.mongodb.org/manual/reference/method/sh.status/
+
+如何迁移数据到MongoDB？
+
+可以通过以下方法迁移数据到MongoDB，包括：
+
+1、使用mongodump和mongorestore工具导出源数据，再导入到副 本集的primary或者分片集群的mongos；
+
+2、如果源db是部署在uhost上，可以在内网通过副本集的复制机制同步数据到UCloud的MongoDB；
+
+MongoDB的内存是如何管理？
+
+MongoDB使用mmap管理内存，内存使用率经常是100%，也有时候经过备份 操作（自动备份和手动备份），内存也会立即升到100%，通常情况下无需担心。内存上升后，通常情况下是不会主动释 放的。
+
+如果是平时的工作载荷，内存使用出现瓶颈，建议是在线升级内存。
+
+MongoDB的磁盘是如何管理？
+
+MongoDB采用预分配机制分配大文件用于存放数据，drop、remove、 compact等操作是不会释放磁盘空间的，但是可以使预分配的空间重用。如果磁盘使用率过高，这时候需要注意 是否会100%。如果磁盘空间使用率接近100%，建议采用以下方法克服：
+
+1、升级磁盘；
+
+2、创建secondary，通过复制方式将数据从primary同步到 secondary，这时候secondary的存储空间往往会较小一些，然后执行一次主从切换；
+
+3、修复db，执行db.repairDatabase，这会阻塞住整个实例的读写服务，不建议使用；
