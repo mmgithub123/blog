@@ -1,0 +1,299 @@
+
+认识什么叫Microsoft Windows 服务？打开Windows系统的“控制面板”——>”管理工具”——>“服务”，可以看到本机运行的Windows服务程序，如下图：
+
+创建Windows服务的做法
+ 
+现在我们练习一下如何增加Windows服务程序。假如本机上已有一个可执行程序：D:\Software\OtherTool\MonitorFolder.exe。我们先打开控制台，输入如下命令：
+
+sc create monitor binpath= "D:\Software\OtherTool\MonitorFolder.exe --service -r D:\Software\OtherTool" displayname= "监控文件夹" start= auto，注意等号后面都有空格，创建成功后会有提示：SC] CreateService 成功，具体如下图：
+
+创建Windows服务的做法
+ 
+我们再打开Windows系统的“控制面板”——>”管理工具”——>“服务”，可以看到出现一个“监控文件夹”的新项目，如下图：
+
+创建Windows服务的做法
+ 
+ 
+ 
+Windows进程管理：
+https://blog.csdn.net/fwhezfwhez/article/details/89955147
+ 
+Repo
+https://github.com/ochinchina/supervisord
+
+安装方式
+go build 得到supervisord.exe,放入GOPATH/bin/或者PATH
+supervisord version 验证是否正确安置
+
+备注
+本文不对具体参数说明，亦不对每一个功能细致讲解，仅仅对生产中使用supervisord的所经步骤进行描述。
+本实例举的是windows下
+有python版supervisor使用经验的体验更佳。
+
+准备程序
+假定需要守护的是这个进程,所在目录:
+G:\go_workspace\GOPATH\src\test_X\test_supervisord
+
+package main
+
+import "github.com/gin-gonic/gin"
+
+func main() {
+r := gin.Default()
+r.GET("/", func(context *gin.Context) {
+context.String(200, "ok")
+})
+r.Run(":7111")
+}
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+go build -o main.exe
+
+准备结束
+G:\go_workspace\GOPATH\src\test_X\test_supervisord 下存在了main.go 与 main.exe
+
+启动supervisord
+先准备配置文件。
+创建文件夹与对应文件
+E:\etc\supervisord.conf,内容
+
+[inet_http_server]
+port=127.0.0.1:9001
+
+[include]
+files = E:\\etc\\supervisord.d\\*.ini
+1
+2
+3
+4
+5
+E:\etc\supervisord.d\,内容
+
+[program:test_supervisord]
+directory=G:\\go_workspace\\GOPATH\\src\\test_X\\test_supervisord
+command=G:\\go_workspace\\GOPATH\\src\\test_X\\test_supervisord\\main 2>/home/web/projects/xyx_srv/gc.log
+# command=go run G:\\go_workspace\\GOPATH\\src\\test_X\\test_supervisord\\main.go 2>/home/web/projects/xyx_srv/gc.log
+stdout_logfile=G:\\go_workspace\\GOPATH\\src\\test_X\\test_supervisord\\stdout.log
+stdout_logfile_backups=50
+redirect_stderr=true
+autostart=true
+autorestart=true
+1
+2
+3
+4
+5
+6
+7
+8
+9
+以上参数复制粘贴即可，必要说明:
+directory: 需要守护的程序所在的目录，也就是main.exe所在目录
+command: 具体执行的命令,如上所示，既可以直接执行main.exe,又可以 go run /…/…/…/…/main.go
+stdout_logfile: 控制台信息打印于该文件,可不存在，会创建自动
+autostart: 自动启动
+autorestart: 自动重启
+
+开始
+cmd
+supervisord -c E:\etc\supervisord.conf -d
+
+在浏览器输入 localhost:7111 得到ok
+
+cmd
+netstat -ano|findstr 7111 查看7111所在pid
+taskkill/pid 14616 -t -f 假设7111对应pid14616，则杀死14616
+
+杀死以后，查看supervisor窗口，发现已经自动重启，在浏览器输入 localhost:7111 得到ok
+
+
+
+ 
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+不恶心的windows服务管理：https://nssm.cc/
+
+ 
+
+官方文档：http://nssm.cc/commands
+
+ 
+
+在power shell里操作命令时，以管理员的身份打开power shell
+
+nssm install servicename  d:\ss\main.exe  (exe所在路径)
+
+然后 
+
+nssm start servicename
+
+nssm status servicename
+
+nssm stop 
+
+nssm remove
+
+等
+
+ 
+
+NSSM - the Non-Sucking Service Manager
+nssm is a service helper which doesn't suck. srvany and other service helper programs suck because they don't handle failure of the application running as a service. If you use such a program you may see a service listed as started when in fact the application has died. nssm monitors the running service and will restart it if it dies. With nssm you know that if a service says it's running, it really is. Alternatively, if your application is well-behaved you can configure nssm to absolve all responsibility for restarting it and let Windows take care of recovery actions.
+
+nssm logs its progress to the system Event Log so you can get some idea of why an application isn't behaving as it should.
+
+nssm also features a graphical service installation and removal facility. Prior to version 2.19 it did suck. Now it's quite a bit better.
+
+NSSM使用说明：
+https://gogs.io/docs/installation/run_as_windows_service
+
+https://blog.csdn.net/qubernet/article/details/104728178
+
+ 
+
+我们很容易会产生这样的一个需求，如果在 Windows 上面有一个程序或者一段脚本，我们需要将其设置为一个可以自启动，断掉会重连的服务。
+
+例如 Nginx 在 windows 上面并没有安装服务，那么我们如何将其作为服务运行呢？
+
+例如 windows 下面的 nginx，我们安装好之后，执行 nginx.exe 这个文件，然后通过 nginx -s ???? 来启停这个服务。
+
+但是这样明显不好，至少挂掉之后就不会再起来了，而且怎么自启动还是个问题。
+
+那么我们很自然会想到将其搞成一个服务。
+
+NSSM
+隆重介绍我们的这个工具，这将是一个具有普遍性意义可用的 Windows 服务管理器。
+
+在这里前置提醒一下，实测只能在 Windows 7 或 Windows Server 2008 以上的系统运行，2003 和 XP 貌似都不太灵光。
+
+名字很风骚：《NSSM – the Non-Sucking Service Manager》
+
+官网：https://nssm.cc/
+
+直接下载：nssm-2-24
+
+很轻巧的一个插件，只有一个 zip，打开之后，我们把里面的 nssm.exe 文件直接复制到 C:\Windows 下面。
+
+然后我们获得了这个很牛叉的 nssm 命令。
+
+创建服务
+例如我们现在要高一个名称为 Nginx 的服务用于执行 nginx。
+
+nssm install <Service Name>
+然后就会弹出一个交互的对话框用于输入服务的信息。
+
+举个栗子
+
+
+
+然后点 Install service，服务就安装成功了。
+
+上图的这个操作也可以用非窗口交互的命令行来完成参数的设定：
+
+nssm set UT2003 Application C:\games\ut2003\System\UCC.exe
+nssm set UT2003 AppDirectory C:\games\ut2003\System
+nssm set UT2003 AppParameters server
+搞我们的 Nginx
+
+同样，执行安装语句：
+
+nssm install Nginx
+第一个 Tab 里面我们输入一下我们需要执行的命令，在这里我们输入 C:\nginx\nginx.exe，其他两项都为空。
+
+另外，我们希望这个服务用 Administrator 来执行，我们选择 Log on 这个 Tab
+
+
+
+在这里填入 Administrator 的用户名密码，就可以完成了。
+
+然后点击 Install service，去服务管理那里启动，大功告成，So easy。
+
+当然还有很多配置，需要学习的请直接看官网介绍：https://nssm.cc/usage
+
+修改服务
+如果创建的时候填错了怎么办？简单：
+
+nssm edit Nginx
+删除服务
+要卸载服务也简单，可以用系统自带的 sc 命令：
+
+sc delete Nginx
+也可以用我们的 NSSM：
+
+nssm remove Nginx
+脑洞请自开
+于是啊，我们可以自己写个 批处理.cmd 啊，python 脚本之类的运行成服务，就不是什么难事了，请自行实验。
+
+ 
+
+ 
+
+1、说明
+NSSM是一个服务封装程序，它可以将普通exe程序封装成服务，使之像windows服务一样运行。同类型的工具还有微软自己的srvany，不过nssm更加简单易用，并且功能强大。它的特点如下：
+
+支持普通exe程序（控制台程序或者带界面的Windows程序都可以）
+安装简单，修改方便
+可以重定向输出（并且支持Rotation）
+可以自动守护封装了的服务，程序挂掉了后可以自动重启
+可以自定义环境变量
+这里面的每一个功能都非常实用，使用NSSM来封装服务可以大大简化我们的开发流程了。
+
+开发的时候是一个普通程序，降低了开发难度，调试起来非常方便
+安装简单，并且可以随时修改服务属性，更新也更加方便
+可以利用控制台输出直接实现一个简单的日志系统
+不用考虑再加一个服务实现服务守护功能
+
+2、下载地址
+https://nssm.cc/download
+
+https://nssm.cc/release/nssm-2.24.zip
+
+ 
+
+3、使用说明
+此处我们以将Kafka设置为Windows系统服务为例子进行展示，具体可参考我的文章https://blog.csdn.net/qubernet/article/details/104718033
+
+将Kafka设置为Windows系统服务
+打开NSSM的win64的文件夹，如D:\Net_业务软件\Net_NSSM\nssm-2.24\win64，然后按住Shift+鼠标右键点击文件夹空白处，选择“在此处打开Powershell窗口”
+
+然后输入.\nssm install调出设置窗体
+在弹出的窗体中，Application选项卡中，
+Path：选择kafka-server-start.bat所在的路径，如D:\Net_Program\Net_Kafka\bin\windows\kafka-server-start.bat
+Startup directory：选择Path后，Startup directory选择会自动填充
+Argument：为启动服务的参数，此处填写D:\Net_Program\Net_Kafka\config\server.properties
+Service name：服务名称，如Kafka-Service
+设置完成后点击Install service按钮即完成，此时去查看系统服务有多了一个叫Kafka-Service的服务了
+
+
+
+4、NSSM常用命令
+安装服务：nssm install 服务名
+删除服务：nssm remove 服务名
+删除服务确定：nssm remove 服务名 confirm
+修改服务（显示界面修改）：nssm edit 服务名
+启动服务：nssm start 服务名
+停止服务：nssm stop 服务名
+重启服务：nssm restart 服务名
+
+更多命令请参考官网说明：https://nssm.cc/commands
+
+
+
+5、参考文档
+使用NSSM将exe封装为服务：https://www.cnblogs.com/TianFang/p/7912648.html
+Windows使用NSSM将任意exe封装为服务：https://gofinall.com/81.html
+如将Kafka打包为Windows服务：https://www.cnblogs.com/xuerong/p/9699950.html
+
+
