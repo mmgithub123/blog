@@ -1,0 +1,233 @@
+程序启动的用户 
+程序systemd service文件
+主目录
+主目录/二进制
+主目录/配置
+主目录/数据
+主目录/日志
+动态库或插件
+比如filebeat：
+home
+
+Home of the Filebeat installation.
+
+ 	
+path.home主目录
+
+bin
+
+The location for the binary files.
+
+{path.home}/bin二进制
+
+ 
+config
+
+The location for configuration files.
+
+{path.home}配置
+
+path.config
+
+data
+
+The location for persistent data files.
+
+{path.home}/data数据
+
+path.data
+
+logs
+
+The location for the logs created by Filebeat.
+
+{path.home}/logs日志
+
+path.logs
+
+ 
+ 
+
+安装部署：
+
+1，使用程序权限启动，
+
+etcd，用etcd用户和etcd组
+
+mongodb，用mongod用户和mongod组
+
+ 
+
+2，二进制安装目录
+
+/usr/local/mongodb/bin
+
+/usr/local/etcd/bin
+
+ 
+
+3，配置文件
+
+/etc/mongod.conf
+
+/etc/etcd.conf
+
+/etc/nginx/default.conf
+
+ 
+
+4,数据目录
+
+有数据盘，放/data下
+
+无数据盘，
+
+放/var/lib/mongod
+
+/var/lib/etcd
+
+ 
+
+5,日志目录
+
+/var/log/应用名
+
+ 
+
+6，pid目录
+
+/var/run/应用名
+
+ 
+
+ 
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+运维实施：
+
+0，提前部署好中间件，比如etcd，kafka，redis，mongodb，samba，对象存储，jaeger等
+
+在samba客户端挂载时，需要
+
+sudo mount -t cifs  //ip地址/scandata /opt/scandata -o uid=（指定挂载后目录的属主）,gid=（指定挂载后目录的组）,username=,password=
+
+在fstab里：
+
+//ip地址/scandata      /opt/scandata               cifs     uid=,gid=,rw,suid,dev,exec,auto,nouser,async,username=,password=        0 0
+
+ 
+
+应用程序发布实施：
+
+1，建立程序账户：testuser系统账户 uid为10000 属于testuser组 没有登录shell
+
+ansible all -m shell -a "groupadd testuser"
+
+ansible all -m shell -a "useradd -u 10000 -r -g testuser -s /sbin/nologin  testuser"
+
+ 
+
+1.1，review配置里的每一个字段，做到可解释
+
+ 
+
+2，创建程序主目录，并更改为app所有（这个要在复制程序和配置之后做）。应用程序部署在/opt下。这里是否要建立bin conf log等子目录看自己场景
+
+ ansible all -m shell -a "sudo mkdir -p /opt/cloudscan/"
+
+ 
+
+3，复制二进制程序和配置到程序主目录。复制完成后更改为app所有
+
+ansible front -m copy -a "src='/home/kjs/cloudscan/app_bin/v0.0.0/app/csfront' dest='/opt/cloudscan/' mode=0755"  注意这里要带上权限，不然复制后会丢失可执行权限
+
+ansible front -m copy -a "src='/home/kjs/cloudscan/scand_conf/csfront.yaml' dest='/opt/cloudscan/'"
+
+ansible front -m shell -a "sudo chown -R app:app  /opt/cloudscan/" 
+
+ 
+
+4，复制systemd service文件。并指定开机自启动
+
+service文件：
+
+[Unit]
+Description=csfront process
+
+[Service]
+User=app
+Group=app
+Type=simple
+Restart=on-failure
+ExecStart=/opt/cloudscan/csfront --conf=/opt/cloudscan/csfront.yaml
+
+[Install]
+WantedBy=multi-user.target
+
+ ansible front -m copy -a "src='/home/kjs/cloudscan/systemd_service_file/csfront.service' dest='/usr/lib/systemd/system/'"
+
+systemctl enable csfront
+systemctl daemon-reload
+
+systemctl start csfront
+
+ 
+
+5，安装额外的库，plugin，tool
+
+Image-ExifTool
+
+trid等
+
+ 
+
+ 6，接入日志ELK
+
+ 
+
+7，接入监控open-falcon
+
+ 
+
+ 
+
+盘点资产（生产发布review）做物理及逻辑架构图
+
+
+部署脚本标准化，如开机自启，崩溃重启等
+
+
+崩溃重启，可以用systemd管理
+
+服务开机自启，需要 systemctl enable service-name
+
+比如nfs开机自动挂载，需要向/etc/fstab写入：
+
+ 10.10.33.38:/data       /mnt/data/              nfs     defaults        0 0
+ 
+
+等等这些。
+
+ 
+
+压力测试
+
+容量规划
+扫描量 20到50万
+查询量时扫描量二到5倍（有突增）
+
+ 
+
+日志接入
+
+
+falcon监控接入
+
+ 
+
+备份方案
+
+https://www.cnblogs.com/mmgithub123/p/15770507.html
+
+ 
