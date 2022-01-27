@@ -1,0 +1,166 @@
+命令：kubectl set image deployment/nginx-deployment nginx=nginx：1.9.2
+
+由于nginx：1.9.2不存在，发布过程卡主我们使用Ctrl-C中止
+
+ 
+
+用kubectl rollout status 命令查看Deployment的更新过程
+
+kubectl rollout status deployment/nginx-deployment
+
+ 
+
+kubectl rollout history查看这个Deployment的历史记录
+
+kubectl rollout history deployment/nginx-deployment
+
+ 
+
+查看特定版本的详情信息
+
+kubectl rollout history deployment/nginx-deployment --revision=3
+
+ 
+
+ 
+
+回滚到上一个版本
+
+kubectl rollout undo deployment/nginx-deployment
+
+回滚到特定版本
+
+kubectl rollout undo deployment/nginx-de
+
+ 
+
+ 
+
+健康检查：
+
+ kubectl get cs
+
+ kubectl get --raw='/readyz'
+
+ 
+
+ 
+
+ 
+
+ 
+
+https://kubernetes.io/zh/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+https://kubernetes.io/zh/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+
+ 
+
+google  yum 用不了，用阿里的：
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=http://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+gpgkey=http://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+        http://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+ 
+
+ 
+
+关闭分区：
+
+swapoff -a
+
+ 
+
+ 
+
+安装docker
+
+然后，（这个要做 是docker 的cgroup用systemd 不然kubelet起不来）
+
+配置 Docker 守护程序，尤其是使用 systemd 来管理容器的 cgroup。
+
+sudo mkdir /etc/docker
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+说明：
+对于运行 Linux 内核版本 4.0 或更高版本，或使用 3.10.0-51 及更高版本的 RHEL 或 CentOS 的系统，overlay2是首选的存储驱动程序。
+
+重新启动 Docker 并在启动时启用：
+
+sudo systemctl enable docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+
+
+
+kubeadm init --control-plane-endpoint 192.168.102.153 --image-repository registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16
+
+初始化命令  ，--image-repository  这个参数重点  设定国内镜像
+
+-pod-network-cidr  指定网段  不然装flannel后 pod一直重启。如果忘记了，也可以后期编辑文件/etc/kubernetes/manifests/kube-controller-manager.yaml，加入
+
+- --allocate-node-cidrs=true
+- --cluster-cidr=10.244.0.0/16
+
+ 
+
+ 
+
+kubeadm init 有问题，
+
+kubeadm reset  可以重置
+
+
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of control-plane nodes by copying certificate authorities
+and service account keys on each node and then running the following as root:
+
+kubeadm join 192.16:6443 --token 9azuxb.larxid04481iuk9m \
+--discovery-token-ca-cert-hash sha256:f8608e6baf030032c288ce2f4e95a230485d7c465c82a481916a5acffcf9241e \
+--control-plane
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.1:6443 --token 9azuxb.larxid04481iuk9m \
+--discovery-token-ca-cert-hash sha256:f8608e6baf030032c288ce2f4e95a230485d7c465c82a481916a5acffcf9241e
+
+ 
+
+用flannel的网
+
+ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+ 
+ 
