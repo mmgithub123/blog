@@ -1,0 +1,146 @@
+开机自动挂载，当然在/etc/fstab里写入挂载项就可以
+
+但此外，/etc/rc.local -> rc.d/rc.local  这个脚本也是会开机自动执行的，那么在这里写上需要mount的命令也可以，比如：
+
+"mount -t cifs  //192.168.3.52/data /opt/data -o username=,password="
+
+但是如果这一行命令执行失败怎么办？会不会把系统hang住？
+
+直接写fstab里，各个挂载选项含义：
+
+ 
+
+比如挂载：
+
+sudo mount -t cifs  //ip地址/scandata /opt/scandata -o uid=（指定挂载后目录的属主）,gid=（指定挂载后目录的组）,username=,password=
+
+在fstab里：
+
+//ip地址/scandata      /opt/scandata               cifs     uid=,gid=,rw,suid,dev,exec,auto,nouser,async,username=,password=        0 0
+
+----------------------------------------------------------------------------------------------------
+
+ 
+
+cat  /etc/fstab   查看分区相关信息
+
+cat /etc/mtab  查看分区挂载信息
+
+/etc/fstab fsck、mount、umount的等命令都利用该程序
+ 	fdisk -l 查看数据盘信息
+df -lhT 查看磁盘容量及文件系统类型,没有分区和格式化数据盘之前，无法看到数据盘
+
+ 
+
+sda是设备名称,也就是你的第一个scsi硬盘(目前linux将sata,usb也认作sdx),以前ide硬盘设备名称是hda...
+ 	
+sda1是sda硬盘设备的其中的一个分区
+
+ 
+
+ 
+
+ 
+
+vda,vdb
+
+hda,hdb
+
+都是一样的概念，就是硬件盘不同
+
+ 
+
+先格式化分区，后挂载：但被分区的盘哪里来的，怎么来的，咱们在fdisk -l 里出现的？
+
+块存储主要是将裸磁盘空间整个映射给主机使用的，可以通过划逻辑盘、做Raid、或者LVM（逻辑卷）等种种方式逻辑划分出N个逻辑的硬盘。
+ 	操作系统还需要对裸硬盘进行分区、格式化后，才能使用，与平常主机内置硬盘的方式完全无异。
+ 
+
+在进行分区格式化时，开发者可以自行决定文件系统的格式，如ext2、ext3等。
+这里以“ext3”为例：
+使用下面的命令对新分区进行格式化。 
+
+mkfs.ext3 /dev/vdb1
+
+
+Linuxgeshi-4.png 
+
+
+
+2.5 挂载新分区
+使用命令“mkdir /mydata”创建mydata目录，再通过“mount /dev/vdb1 /mydata”命令手动挂载新分区后，用“df -h”命令查看，出现以下信息说明挂载成功，即可以查看到数据盘了。
+shoudonggeshi-1.png 
+
+ 
+
+如果希望云服务器在重启或开机时能自动挂载数据盘，必须将分区信息添加到/etc/fstab中。如果没有添加，则云服务器重启或开机后，都不能自动挂载数据盘。
+请确认分区路径是否为 “/dev/vdb1”,若路径错误，将会造成云主机重启失败
+使用“echo '/dev/vdb1 /mydata ext3 defaults 0 0' >> /etc/fstab”命令添加分区信息后，使用“cat /etc/fstab”命令查看，出现以下信息表示添加分区信息成功。
+Linuxgeshi-6.png
+
+ 
+
+ 
+
+fuser -v -m /data
+
+查看 /data目录，被哪些进程占用
+
+sudo lsof /data
+
+lsof  查看目录被哪些程序占用
+
+ 
+
+umount   目录绝对路径   卸载挂载点
+
+如果umount提示忙，可以用  lsof 和 fuser 命令查看删除
+
+mount     盘符    目录   挂载目录
+
+盘符 可以用 fdisk -l  命令查看
+
+ 
+
+----------------------------------------------------------------------------------------------------------------------------
+
+/etc/fstab 详解
+ 
+在linux中/etc/fstab的数据项如下所示：
+ 设备名称        挂载点          分区的类型   挂载选项     dump选项 fsck选项
+     LABEL=/       /                   ext3        defaults             1                   1
+     tmpfs       /dev/shm           tmpfs    defaults            0                    0
+     devpts     /dev/pts          devpts  gid=5,mode=620    0                    0
+     sysfs        /sys               sysfs       defaults            0                    0
+     proc         /proc               proc         defaults           0                    0
+ 1、设备名称项，可以是实际的设备名称/dev/sda1，也可以是实际设备的标签例如LABLE=/，我们可以知道 LABEL=/1是/dev/sda1的标签；那我们用什么命令来为实际的设备设置标签的方法，对于ext3和ext2文件系统，我们可以用e2label 来设置 e2label device [newlabel],比如我们想把文件系统为ext3 的分区/dev/hda1的标签设备为 /1 ，我们应该执行如下的命令：[root@localhost beinan]# e2label /dev/hda1  /1
+2、挂载点，没什么多说的，/、 /usr、 swap 都是系统安装时分区的默认挂载点。方法如下：
+      root@localhost beinan]# mkdir /mnt/hda1 注：创建挂载/dev/hda1分区的目录；
+     [root@localhost beinan]# chmod 777 /mnt/hda1 注：打开权限，所有用户可读可写可执行，执行完了以上两步就可以再/etc/fstab里      使用这个挂载点了
+ 3、 文件系统类形:
+      Linux file systems: ext2, ext3, jfs, reiserfs, reiser4, xfs, swap.
+      Windows:
+      vfat = FAT 32, FAT 16
+      ntfs= NTFS
+      Note: For NTFS rw ntfs-3g
+      CD/DVD/iso: iso9660
+      Network file systems:
+      nfs: server:/shared_directory /mnt/nfs nfs <options> 0 0
+      smb: //win_box/shared_folder /mnt/samba smbfs rw,credentials=/home/user_name/winbox-credentials.txt 0 0
+      auto: The file system type (ext3, iso9660, etc) it detected automatically. Usually works. Used for removable devices   
+      (CD/DVD, Floppy drives, or USB/Flash drives) as the file system may vary on thesedevices.
+4、 挂载选项,下面列举几个常用的：  
+        auto: 系统自动挂载，fstab默认就是这个选项
+        defaults: rw, suid, dev, exec, auto, nouser, and async.
+        noauto 开机不自动挂载
+        nouser 只有超级用户可以挂载
+        ro 按只读权限挂载
+        rw 按可读可写权限挂载
+        user 任何用户都可以挂载
+        请注意光驱和软驱只有在装有介质时才可以进行挂载，因此它是noauto
+     
+5、dump选项，设置是否让备份程序dump备份文件系统，0为忽略，1为备份,如果上次用dump备份，将显示备份至今的天数。
+      
+6、fsck选项，告诉fsck程序以什么顺序检查文件系统，为0就表示不检查，（/）分区永远都是1，其它的分区只能从2开始，当数字相同就    
+   同时检查（但不能有两1）,
+ 注意：当你修改了/etc/fstab后，一定要重新引导系统才会有效。
