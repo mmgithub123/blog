@@ -1,0 +1,316 @@
+开机会自动执行的脚本：
+
+ 
+
+/etc/rc.local -> rc.d/rc.local  (这是自定义的开机初始化)
+
+实际上，所有开机先运行的全在/etc/rc.d下，比如/etc/rc.d/init.d/network启动网络
+
+注意给 rc.d/rc.local 执行权限
+
+--------------------------------------------------------------------------
+
+ export  环境变量相关操作：
+
+ export -p //列出当前的环境变量值
+
+# export MYENV=7 //定义环境变量并赋值
+ 
+
+更改hostname
+
+hostname -b  test1
+
+ 
+
+ 
+
+kill -15  优雅退出
+
+ 
+
+追加文件内容：
+
+cat >>/root/test/append<<EOF
+c
+EOF
+
+把字母c追加到/root/test/append
+
+ 
+
+追加多行内容到文件：
+
+echo -e "a\nb\nc">>/root/test/append
+
+ 
+
+ 
+
+ssh：
+
+ssh-copy-id localhost
+
+ssh-copy-id命令可以把本地主机的公钥复制到远程主机的authorized_keys文件上，ssh-copy-id命令也会给远程主机的用户主目录（home）和~/.ssh, 和~/.ssh/authorized_keys设置合适的权限
+
+ 
+
+netstat  
+
+netstat -anp  查看所有端口
+
+ --------------------------------------------------------------------------------------
+
+vi  搜索替换
+
+：n，$s/vivian/sky/g 替换第 n 行开始到最后一行中每一行所有 vivian 为 sky 
+
+ 
+
+---------------------------------------------------------------------
+
+查看linux所有用户：
+
+用户：/etc/passwd，/etc/shadow，/etc/group
+
+compgen -u
+
+ 
+
+cat /etc/passwd
+
+filebeat:x:996(uid):1000(gid)::/home/filebeat（家目录）:/sbin/nologin
+
+id filebeat
+uid=996(filebeat) gid=1000(filebeat) groups=1000(filebeat),4(adm)(逗号分隔的组)
+
+ 
+
+添加用户：
+
+添加一个登录用户：
+
+useradd -m testuser (-m 表示登录用户)
+
+passwd testuser
+
+visudo  添加sudo免密
+
+ 
+
+ 
+
+ useradd -u 1001 elk
+
+ 
+
+id elk
+uid=1001(elk) gid=1001(elk) groups=1001(elk)
+
+ 
+
+passwd elk
+
+ 
+
+groupadd redis
+
+useradd -r -g redis -s /sbin/nologin redis
+
+查看所有用户：
+
+cat /etc/passwd
+
+ 
+
+查看所有组：
+
+/etc/group
+
+ 
+
+永久性删除用户账号
+userdel peter
+
+groupdel peter
+
+ 
+
+ 
+
+sudo
+
+切换用户执行命令
+
+ 
+
+免密码sudo，配置/etc/sudoers文件
+
+使用visudo 命令进行编辑
+
+ 
+
+查找文件
+
+ find / -name "dump.rdb"
+
+ 
+
+---------------------------------------------------------------------------------------------------------
+
+nohup
+
+nohup command >> test.log 2>&1 &
+
+ 
+
+---------------------------------------------------------------------------------------------
+
+yum清缓存
+
+yum clean all 
+
+ 
+
+ yum provides  fuser，查看命令是由哪个包提供的
+
+psmisc-22.20-17.el7.x86_64 : Utilities for managing processes on your system（包名）
+Repo : base
+Matched from:
+Filename : /usr/sbin/fuser
+
+然后  sudo yum install psmisc  就可以安装了
+
+ 
+
+yum,rpm
+ 	yum list installed 查看机器上已经用yum安装了的包
+ 	rpm -ql mysql 查看yum安装位置
+ 	yum repolist all 查看yum源列表
+ 	yum grouplist 查看已安装和可安装的工具包group
+ 	（?centos的一些版本没有源
+ 	yum install epel-release
+ 	ls -lah /etc/yum.repos.d/
+ 	(？rpm -e epel-release
+ 	如果ls -lah /etc/yum.repos.d/找不到epel源，说明之前有安装脏
+ 	需要rpm -e epel-release
+ 	再yum install epel-release
+ 	）
+ 	yum remove mod_wsgi yum删除
+ 	 
+ 	rpm:
+ 	-e, --erase=<package>+ erase (uninstall) package 删除
+ 	-i, --install install package(s) 安装
+ 	-v, --verbose provide more detailed output
+ 	-h, --hash print hash marks as package installs (good with -v)
+ 	-l, --list list files in package(with -q)
+ 	-U, --upgrade=<packagefile>+ upgrade package(s) 升级
+ 	-a, --all query/verify all packages
+ 	-q 查询
+ 	安装，升级，删除，查询可组合其他命令选项使用，例子：
+ 	rpm -q logstash 查看某个包是否被安装
+ 	rpm -qa logstash 列出所有已安装的rpm包
+ 	rpm -ql mysql 查看安装位置
+ 	rpm -ivh logstash-2.1.1-1.noarch.rpm 安装某个rpm软件包
+ 	rpm -Uvh logstash-2.1.1-1.noarch.rpm 升级某个rpm包
+ 	rpm -e epel-release 卸载某个已用rpm方式安装的软件
+翻页查看：
+
+使用命令rpm -ql kernel-headers-3.10.0-957.21.2.el7.x86_64|less查看安装目录，因安装目录太多故后面加less方便翻页查看
+
+ 
+
+----------------------------------------------------------------------------------------------
+
+fuser -v -m /data
+
+查看 /data目录，被哪些进程占用
+
+ 
+
+sudo lsof /data
+
+lsof  查看目录被哪些程序占用
+
+ 
+
+------------------------------------------------------------------------------
+
+scp
+
+scp elasticsearch-7.16.2-x86_64.rpm username@ip address:/home
+
+ 
+
+----------------------------------------------------------------------------------------------
+
+tips:
+
+While another partition would be located at D:\ on Windows, this other partition would appear in another folder under / on Linux.:
+
+https://www.howtogeek.com/117435/htg-explains-the-linux-directory-structure-explained/
+
+ 
+
+trap命令，定义接受信号后的行为
+
+trap命令的参数分为两部分，前一部分是接收到指定信号时将要采取的行动，后一部分是要处理的信号名。
+ 
+trap command signal
+ 
+它有三种形式分别对应三种不同的信号回应方式。
+第一种：
+ 
+trap "commands" signal-list
+ 
+当脚本收到signal-list清单内列出的信号时，trap命令执行双引号中的命令。
+第二种：
+ 
+trap signal-list
+ 
+trap不指定任何命令，接受信号的默认操作，默认操作是结束进程的运行。
+第三种：
+ 
+trap " " signal-list
+ 
+trap命令指定一个空命令串，允许忽视信号，我们用到的就是这一种。
+※请记住，脚本程序通常是以从上到下的顺序解释执行的，所以必须在你想保护的那部分代码以前指定trap命令。
+ 
+
+------------------------------------------------------------------------------------------------
+
+sed  文本编辑
+
+ 
+
+sed   -i 直接操作指定文件|-e输出到标准输出   '行号 要做的动作'    要操作的文件
+
+ 
+
+替换指定行的内容：
+
+ sed -i '134 s/localhost/192.168.102.155/g' filebeat.yml 
+
+ 
+
+每一行开头加上sudo：
+
+sed -i 's/^/sudo &/g' filebeat.sh  （^表示开头）
+
+ 
+
+4 行之后追加 2 行：
+
+sed -e '4 a newline\nnewline2' testfile
+
+
+--------------------------------------------------------------------------
+脚本：
+获取eth0的ip地址
+ ifconfig eth0 | grep inet|grep -v inet6 |awk '{print $2}'
+
+ip=$(ifconfig eth0 | grep inet|grep -v inet6 |awk '{print $2}')          #shell中把命令结果赋值给变量   变量名=$(要执行的命令)
+echo $ip                                                                                        #使用变量
+sed -i "134 s/localhost/$ip/g" /opt/filebeat.yml                              #双引号可以做变量替换，单引号不行
+
+ 
