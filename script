@@ -1,0 +1,537 @@
+sed里一定注意换行，很显然因为sed是行编辑器。
+
+文件多行编辑：
+
+原文件  test.yaml
+
+engines:
+clv:
+    install: '/usr/bin'
+ch:
+    install: '/opt/ch'
+cyn:
+    install: '/opt/cyn'
+
+
+ 
+
+脚本执行后文件
+
+engines:
+clv:
+    install: '/usr/bin'
+    extra:
+      user: app
+      group: app
+ch:
+    install: '/opt/ch'
+    extra:
+      user: app
+      group: app
+cyn:
+    install: '/opt/cyn'
+    extra:
+       user: app
+       group: app
+
+
+脚本：
+
+for ((i=0;i<${arr_len};i++))
+do
+#must use root start
+if [[ "${must_use_root_start[@]}" =~ "${engine_arr[${i}]}" ]];then
+continue
+else
+echo "add user app group app to csscand-${engine_arr[${i}]}.yaml"
+sed -i '1,$ s/\(^.*install.*\)/\1\n extra:\n user: app\n group: app/g' /root/script/scand_conf/csscand-${engine_arr[${i}]}.yaml 
+sed -i '105d' /root/script/scand_conf/csscand-${engine_arr[${i}]}.yaml
+fi
+done
+
+脚本最主要的这一行：
+
+sed -i '1,$ s/\(^.*install.*\)/\1\n    extra:\n      user: app\n      group: app/g' /root/script/scand_conf/csscand-${engine_arr[${i}]}.yaml
+
+1，注意 -i 后 ‘’ 两个单引号里不要有换行，就是shell脚本编辑里不要有换行，在一行里写。
+
+2，替换的文本里想换行用\n,想使用空格就直接在shell脚本里按空格键，在shell脚本里就是一个空白，上面extra前面有四个空白，所以替换后的文本extra前面就有四个空格。user和group前面有六个。
+
+3，1,$ 表示从第一行到最后一行，就是对文件所有行执行后面的替换命令
+
+4，s///g命令里，用括号()来捕获正则的匹配，用\1来引用捕获到的匹配，注意括号需要转义变成\(
+
+5,^表示从头匹配 ，.*表示匹配所有字符，^.*表示匹配install这个字符前的所有字符。注意sed是行编辑器，所以这里install之后的.*最多匹配一行
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Shell 进程执行出错时，可以根据退出状态来判断具体出现了什么错误，比如打开一个文件时，我们可以指定 1 表示文件不存在，2 表示文件没有读取权限，3 表示文件类型不对。
+
+---------------------------------------------------------------------------------------------------------------------
+
+eval 把变量内容当作命令执行
+
+比如
+
+[root@test3 opt]# date
+Mon Jan 10 06:32:33 EST 2022
+
+显示当前时间
+
+[root@test3 opt]# date -u +%Y-%m-%dT%H:%M:%S.%06NZ
+2022-01-10T11:33:15.485973Z
+
+格式化显示
+
+[root@test3 opt]# mydate="date -u +%Y-%m-%dT%H:%M:%S.%06NZ"
+[root@test3 opt]# echo ${mydate}
+date -u +%Y-%m-%dT%H:%M:%S.%06NZ
+
+把命令date -u +%Y-%m-%dT%H:%M:%S.%06NZ 赋值给变量mydate，并输出了mydate
+
+[root@test3 opt]# eval ${mydate}
+2022-01-10T11:33:54.879716Z
+
+执行变量mydate里的命令
+
+-----------------------------------------------------------------------------------------------------------------
+
+continue 2    （直接双层循环都continue，如果不写2 只写continue 那就只是当前循环继续了）
+
+------------------------------------------------------------------------------------------------------------------
+
+shell数组：
+
+https://www.runoob.com/linux/linux-shell-array.html
+
+用#来获取长度
+
+比如${#array_name}，这里的知识是：
+
+$0
+当前脚本的文件名
+$n
+传递给脚本或函数的参数。n 是一个数字，表示第几个参数。例如，第一个参数是$1，第二个参数是$2。
+$#
+传递给脚本或函数的参数个数。
+$*
+传递给脚本或函数的所有参数。
+$@
+传递给脚本或函数的所有参数。
+$* 和 $@ 的区别
+$* 和 $@ 都表示传递给函数或脚本的所有参数，不被双引号(" “)包含时，都以”$1" “2 &quot; … &quot; 2&quot; … &quot;2"…"n” 的形式输出所有参数
+当它们被双引号(" “)包含时，”$*" 会将所有的参数作为一个整体，以"$1 $2 … n &quot; 的 形 式 输 出 所 有 参 数 ； &quot; n&quot;的形式输出所有参数；&quot;n"的形式输出所有参数；"@" 会将各个参数分开，以"$1" “2 &quot; … &quot; 2&quot; … &quot;2"…"n” 的形式输出所有参数。
+$?
+上个命令的退出状态，或函数的返回值。
+$$
+当前Shell进程ID。对于 Shell 脚本，就是这些脚本所在的进程ID。
+
+
+---------------------------------------------------------------------------------------------------------------
+
+shell判断：
+
+文件表达式
+-e filename 如果 filename存在，则为真
+-d filename 如果 filename为目录，则为真 
+-f filename 如果 filename为常规文件，则为真
+-L filename 如果 filename为符号链接，则为真
+-r filename 如果 filename可读，则为真 
+-w filename 如果 filename可写，则为真 
+-x filename 如果 filename可执行，则为真
+-s filename 如果文件长度不为0，则为真
+-h filename 如果文件是软链接，则为真
+filename1 -nt filename2 如果 filename1比 filename2新，则为真。
+filename1 -ot filename2 如果 filename1比 filename2旧，则为真。
+
+
+整数变量表达式
+-eq 等于
+-ne 不等于
+-gt 大于
+-ge 大于等于
+-lt 小于
+-le 小于等于
+
+
+字符串变量表达式
+If  [ $a = $b ]                 如果string1等于string2，则为真
+                                字符串允许使用赋值号做等号
+if  [ $string1 !=  $string2 ]   如果string1不等于string2，则为真       
+if  [ -n $string  ]             如果string 非空(非0），返回0(true)  
+if  [ -z $string  ]             如果string 为空，则为真
+if  [ $sting ]                  如果string 非空，返回0 (和-n类似) 
+
+
+    逻辑非 !                   条件表达式的相反
+if [ ! 表达式 ]
+if [ ! -d $num ]               如果不存在目录$num
+
+
+    逻辑与 –a                   条件表达式的并列
+if [ 表达式1  –a  表达式2 ]
+
+
+    逻辑或 -o                   条件表达式的或
+if [ 表达式1  –o 表达式2 ]
+
+ 
+
+case语句：
+
+case $变量名 in
+"值 1")
+;;
+如果变量的值等于值1，则执行程序1，值
+2")
+如果变量的值等于值2，则执行程序2
+…省略其他分支…
+*)
+如果变量的值都不是以上的值，则执行此程序
+;;
+esac
+
+这条语句需要注意以下内容：
+
+case 语句会取出变量中的值，然后与语句体中的值逐一比较。如果数值符合，则执行对应的程序；如果数值不符，则依次比较下一个值；如果所有的值都不符合，则执行"*)"（"*"代表所有其他值）中的程序。
+case 语句以"case"开头，以"esac"结尾。
+在每个分支程序之后要以";;"（双分号）结尾，代表该程序段结束（千万不要忘记）。
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+例子：
+
+#!/bin/sh
+
+#array
+engine_arr=(a b c d)
+echo ${engine_arr[@]}    [@]数组所有元素
+arr_len=${#engine_arr[@]}   #对所有元素求长度值
+echo ${arr_len}
+
+for ((i=0;i<${arr_len};i++))
+do
+echo "The value is: ${engine_arr[${i}]}"
+done
+
+exit
+
+line_text=$(sed -n '7p' filebeat.yml)
+echo $line_text
+
+sub_str="#"
+result=$(echo $line_text | grep "${sub_str}")
+if [[ "$result" != "" ]]
+then
+sed -i '7 s/#//g' filebeat.yml
+else
+echo "nothing"
+fi
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+filebeat：
+
+#!/bin/sh
+
+####check filebeat installed or not
+echo "starting uninstall it"
+rpm -e filebeat
+rm -rf /var/lib/filebeat
+rm -rf /var/log/filebeat
+rm -rf /etc/filebeat
+rm -rf /usr/share/filebeat
+
+echo "starting install it"
+
+ 
+
+####create filebeat user
+groupadd filebeat
+useradd -r -g filebeat -s /sbin/nologin filebeat
+
+####rpm install filebeat
+rpm -vi filebeat-7.16.2-x86_64.rpm
+
+####file access
+chmod 644 /etc/filebeat/filebeat.yml
+
+####config systemd filebeat service file
+#sed -i '7 a User=filebeat\nGroup=filebeat' /usr/lib/systemd/system/filebeat.service
+#systemctl daemon-reload
+echo "first start filebeat"
+systemctl start filebeat;systemctl status filebeat;systemctl enable filebeat
+
+####config filebeat es output
+#ip=$(ifconfig eth0 | grep inet|grep -v inet6 |awk '{print $2}')
+#echo "this host ip is $ip"
+echo "es ip is 192.168.100.159"
+sed -i '134 s/localhost/192.168.100.159/g' /etc/filebeat/filebeat.yml
+sed -i '141 s/#//g' /etc/filebeat/filebeat.yml
+sed -i '142 s/changeme/${ES_PWD}/g' /etc/filebeat/filebeat.yml
+sed -i '142 s/#//g' /etc/filebeat/filebeat.yml
+
+
+####create es output password keystore
+filebeat keystore create
+filebeat keystore add ES_PWD
+
+####config kibana
+sed -i "107 s/localhost/192.168.102.154/g" /etc/filebeat/filebeat.yml
+sed -i '107 s/#//g' /etc/filebeat/filebeat.yml
+
+####enable modules
+filebeat modules enable nginx mysql
+sed -i '11 s/:/: [\/var\/log\/nginx\/access.log*]/g' /etc/filebeat/modules.d/nginx.yml
+sed -i '11 s/#//g' /etc/filebeat/modules.d/nginx.yml
+
+####check config and restart filebeat
+filebeat test config --path.config=/etc/filebeat
+echo "check config and second restart filebeat"
+systemctl restart filebeat;systemctl status filebeat
+
+
+####create es filebeat index template
+filebeat setup -e
+
+####after create es filebeat index template,third restart filebeat
+systemctl restart filebeat;systemctl status filebeat
+
+ 
+
+ ------------------------------------------------------------------------------
+
+如果行存在#就替换为空，就是取消注释，如果已取消注释了，就啥都不干
+
+#!/bin/sh
+
+line_text=$(sed -n '7p' filebeat.yml)
+echo $line_text
+
+sub_str="#"
+result=$(echo $line_text | grep "${sub_str}")
+if [[ "$result" != "" ]]
+then
+sed -i '7 s/#//g' filebeat.yml
+else
+echo "nothing"
+fi
+
+ 
+
+-----------------------------------------------------------------------------------------------
+
+ 
+
+ 
+
+nginx:
+
+ 
+
+#!/bin/sh
+
+sudo yum install yum-utils
+
+sudo touch /etc/yum.repos.d/nginx.repo
+
+sudo chmod 666 /etc/yum.repos.d/nginx.repo
+
+sudo cat >>/etc/yum.repos.d/nginx.repo<<EOF
+[nginx-stable]
+name=nginx stable repo
+baseurl=http://nginx.org/packages/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+
+[nginx-mainline]
+name=nginx mainline repo
+baseurl=http://nginx.org/packages/mainline/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+EOF
+
+sudo yum install nginx
+
+sudo systemctl start nginx
+
+ 
+
+ 
+
+ 
+
+ 
+
+mongodb:
+
+ 
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+批量：
+
+#!/bin/sh
+
+#all engine array
+engine_arr=(
+
+vba
+hauri
+quickheal
+
+h3c
+)
+
+#must use root start array
+must_use_root_start=(
+bitdefender
+)
+
+#use engine self install user array
+#engine_self_install_user_start=(
+#)
+
+#echo ${engine_arr[@]}
+arr_len=${#engine_arr[@]}
+#echo ${arr_len}
+
+
+for ((i=0;i<${arr_len};i++))
+do
+#must use root start
+if [[ "${must_use_root_start[@]}" =~ "${engine_arr[${i}]}" ]];then
+echo "have use root start ${engine_arr[${i}]}"
+else
+echo "[Unit]
+Description=nsqd process
+
+[Service]
+Type=simple
+Restart=on-failure
+ExecStart=
+
+[Install]
+WantedBy=multi-user.target
+" >>/opt/${engine_arr[${i}]}.service
+fi
+#use engine self install user start
+if [[ "${engine_self_install_user_start[@]}" =~ "${engine_arr[${i}]}" ]];then
+echo "use engine install user start ${engine_arr[${i}]}"
+else
+echo ""
+fi
+done
+
+ 
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+批量包装systemctl
+
+#!/bin/sh
+
+
+engine_arr=(
+nod32
+tachyon
+h3c
+)
+engine_arr_len=${#engine_arr[@]}
+
+
+case "$1" in
+start)
+action=$1
+;;
+stop)
+action=$1
+;;
+restart)
+action=$1
+;;
+status)
+action=$1
+;;
+help)
+echo "enginectl help"
+echo "enginectl start|stop|restart|status all|engine-name"
+;;
+*)
+echo "enginectl help"
+echo "enginectl start|stop|restart|status all|engine-name"
+;;
+esac
+
+case "$2" in
+all)
+object=$2
+;;
+*)
+#if not in array echo help message else object=$2
+for ((i=0;i<${engine_arr_len};i++))
+do
+if [[ "${engine_arr[@]}" =~ "$2" ]];then
+object=$2
+else
+echo "enginectl help"
+echo "enginectl start|stop|restart|status all|engine-name"
+break
+fi
+done
+;;
+esac
+
+if [[ $object = 'all' ]];then
+for ((i=0;i<${engine_arr_len};i++))
+do
+echo "systemctl $action ${engine_arr[$i]}"
+done
+else
+echo "systemctl $action $object"
+fi
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+查看系统中所有用户及用户id：
+
+#!/bin/sh
+
+
+user_arr=(
+root
+bin
+daemon
+adm
+lp
+sync
+shutdown
+halt
+mail
+operator
+games
+ftp
+nobody
+systemd-network
+dbus
+polkitd
+sshd
+postfix
+chrony
+rpc
+rpcuser
+nfsnobody
+nginx
+filebeat
+)
+user_arr_len=${#user_arr[@]}
+
+
+for ((i=0;i<${user_arr_len};i++))
+do
+echo ${user_arr[$i]}
+id -u ${user_arr[$i]}
+done
