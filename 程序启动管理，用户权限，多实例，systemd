@@ -1,0 +1,126 @@
+程序启动的用户 
+程序systemd service文件
+主目录
+主目录/二进制
+主目录/配置
+主目录/数据
+主目录/日志
+动态库或插件
+比如filebeat：
+home
+
+Home of the Filebeat installation.
+
+ 	
+path.home主目录
+
+bin
+
+The location for the binary files.
+
+{path.home}/bin二进制
+
+ 
+config
+
+The location for configuration files.
+
+{path.home}配置
+
+path.config
+
+data
+
+The location for persistent data files.
+
+{path.home}/data数据
+
+path.data
+
+logs
+
+The location for the logs created by Filebeat.
+
+{path.home}/logs日志
+
+path.logs
+
+ 
+mysqld@.service (RPM platforms), mysql@.service (Debian platforms): Like mysqld.service or mysql.service, but used for managing multiple MySQL instances.
+
+用做多实例，并且可搭配%i  指示符，比如以下配置，多实例多用户：
+[Unit]
+Description=BitTorrent Sync service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/btsync --nodaemon --config /home/%i/.sync/btsync.conf
+Restart=on-abort
+User=%i
+Group=users
+
+[Install]
+WantedBy=multi-user.target
+ 
+
+指示符详解：https://www.freedesktop.org/software/systemd/man/systemd.unit.html#Specifiers
+
+ 
+
+二进制安装MySQL的命令序列：
+
+$> groupadd mysql
+
+$> useradd -r -g mysql -s /bin/false mysql
+
+$> cd /usr/local
+
+$> tar xvf /path/to/mysql-VERSION-OS.tar.xz
+
+$> ln -s full-path-to-mysql-VERSION-OS mysql
+
+$> cd mysql
+
+$> mkdir mysql-files
+
+$> chown mysql:mysql mysql-files
+
+$> chmod 750 mysql-files
+
+$> bin/mysqld --initialize --user=mysql
+
+$> bin/mysql_ssl_rsa_setup
+
+$> bin/mysqld_safe --user=mysql & # Next command is optional
+
+$> cp support-files/mysql.server /etc/init.d/mysql.server
+
+可以看到，以某个用户启动程序的本质是：
+
+chown mysql:mysql mysql-files
+
+$> chmod 750 mysql-files
+
+$> bin/mysqld --initialize --user=mysql
+
+$> bin/mysql_ssl_rsa_setup
+
+$> bin/mysqld_safe --user=mysql & 
+
+创建出一个用户，并使这个用户对程序有权限，然后以这个用户启动程序。（三种种方法，1，在systemd配置里指定。2，使用sudo -u  用户名。3，像MySQL一样给二进制mysqld传参 --user=mysql）.相应的，如果是以某个用户登录，比如以bob这个用户登录，那么启动起来的程序就属于bob。
+
+Linux下查看所有用户：
+
+cat /etc/passwd
+
+上面mysqld_safe 是一个shell脚本，源码在：https://www.cnblogs.com/mmgithub123/p/15711200.html ，而传参--user=mysql 也是给二进制mysqld传参，就是
+
+bin/mysqld --verbose --help | grep user 的输出
+
+-u, --user=name              Run mysqld daemon as user.
+
+ 
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+以redis为例子，见 https://www.cnblogs.com/mmgithub123/p/15702165.html
