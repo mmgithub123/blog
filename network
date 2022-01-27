@@ -1,0 +1,119 @@
+telnet   测试tcp端口
+
+nc   测试tcp，udp端口
+
+ 
+
+windows下用nmap，https://nmap.org/book/inst-windows.html
+
+ 
+
+----------------------------------------------------------------------------------
+
+ 
+
+dig
+
+nslookup
+
+ 
+
+traceroute：
+
+跟踪数据包到达网络主机所经过的路由工具
+
+ 
+
+netstat
+
+查看tcp连接状态：
+
+netstat -nat
+
+查看各种连接状态的数量：
+
+netstat -an | awk '/^tcp/ {++S[$NF]} END {for(a in S) print a, S[a]}'
+
+查看端口套接字：
+
+lsof -i:9092
+
+ 
+
+客户端：
+
+客户端的状态可以用如下的流程来表示：
+
+CLOSED->SYN_SENT->ESTABLISHED->FIN_WAIT_1->FIN_WAIT_2->TIME_WAIT->CLOSED
+
+ 
+
+服务端：
+
+CLOSED->LISTEN->SYN收到->ESTABLISHED->CLOSE_WAIT->LAST_ACK->CLOSED
+
+在建立连接的时候，服务器端是在第三次握手之后才进入数据交互状态，而关闭连接则是在关闭连接的第二次握手以后（注意不是第四次）。而关闭以后还要等待客户端给出最后的ACK包才能进入初始的状态。
+
+
+
+ 
+
+ 
+
+ 
+
+tcpdump
+
+ 
+
+ifconfig
+
+ 
+
+ip
+
+#!/usr/bin/env bash 
+
+echo  "> Network devices" 
+
+查看网络设备
+
+ip link 
+
+ 
+
+echo -e "\n> Route table" 
+
+查看路由表路由规则
+
+ip route 
+
+ 
+
+echo -e "\n> Iptables rules" 
+
+查看网络数据包过滤规则
+
+iptables --list-rules
+
+ 
+
+--------------------------------------------------------------------------------------------
+
+内网地址：
+
+最常见的是192.168的，公司内网
+
+其次10点几的，机房内网
+
+172B类的一般般
+
+A类地址：10.0.0.0--10.255.255.255
+ 	B类地址：172.16.0.0--172.31.255.255
+ 	C类地址：192.168.0.0--192.168.255.255
+ 	所以局域网在选取使用私有地址时，一般会按照实际需要容纳的主机数来选择私有地址段。
+ 	
+常见的局域网由于容量小，一般选择C类的192.168.0.0作为地址段使用，一些大型企业就需要使用B类甚至A类地址段作为内部网络的地址段。
+
+、
+
