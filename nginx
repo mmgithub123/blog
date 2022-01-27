@@ -1,0 +1,72 @@
+install:
+
+ 注意脚本里$的转义
+
+sudo yum install yum-utils
+
+touch /etc/yum.repos.d/nginx.repo
+
+
+
+cat >>/etc/yum.repos.d/nginx.repo<<EOF
+[nginx-stable]
+name=nginx stable repo
+baseurl=http://nginx.org/packages/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+
+[nginx-mainline]
+name=nginx mainline repo
+baseurl=http://nginx.org/packages/mainline/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+ EOF
+ 
+ 
+sudo yum install nginx
+
+ sudo systemctl start nginx
+
+
+
+use:
+
+
+the configuration file is named nginx.conf and placed in the directory /usr/local/nginx/conf, /etc/nginx, or /usr/local/etc/nginx.
+配置文件：
+ /etc/nginx/nginx.conf 
+
+可执行文件在：
+/usr/sbin/nginx
+
+ 
+
+启动：
+
+systemctl start nginx
+
+ 
+
+80端口
+
+ 
+
+pid文件
+
+/run/nginx.pid
+
+ 
+
+nginx -s signal
+Where signal may be one of the following:
+
+stop — fast shutdown
+quit — graceful shutdown
+reload — reloading the configuration file
+reopen — reopening the log files
+nginx -s quit
+nginx -s reload
