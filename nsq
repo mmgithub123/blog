@@ -1,0 +1,17 @@
+nsq  消费者端服务发现
+
+无副本架构
+
+一个nsqd可以 注册到多个lookupd
+
+一个lookupd可以被多个nsqd注册
+
+lookup做服务发现
+
+ 
+
+ 
+
+不保证有序
+
+ 
