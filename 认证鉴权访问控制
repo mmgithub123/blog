@@ -1,0 +1,15 @@
+mysql
+
+mongo
+
+redis
+
+etcd
+
+es：
+
+https://www.elastic.co/guide/en/elasticsearch/reference/7.16/security-api.html
+
+https://www.elastic.co/guide/en/beats/filebeat/7.16/feature-roles.html
+
+https://www.elastic.co/guide/en/elasticsearch/reference/7.16/configuring-stack-security.html
