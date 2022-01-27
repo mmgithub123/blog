@@ -1,0 +1,283 @@
+官网：
+
+https://kafka.apache.org/quickstart
+
+ 
+
+install:
+
+ 
+
+wget --no-check-certificate https://dlcdn.apache.org/kafka/3.0.0/kafka_2.13-3.0.0.tgz （scala版本2.13,kafka版本3.0.0）
+
+ 
+
+tar -xzf kafka_2.13-3.0.0.tgz
+ cd kafka_2.13-3.0.0
+
+bin/zookeeper-server-start.sh config/zookeeper.properties
+
+
+bin/kafka-server-start.sh config/server.properties
+
+
+zookeeper   2181 访问kafka
+
+--------------------------------------------------------------------
+远端访问需要配置
+server.properties
+
+listeners=PLAINTEXT://这里用机器相应的ip:9092  ，默认listeners=PLAINTEXT://:9092监听不到外围流量
+
+ 
+
+ 
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+kafka启动时会在日志里记录初始化信息：
+
+[2022-01-18 07:22:46,808] INFO KafkaConfig values:
+advertised.listeners = null
+alter.config.policy.class.name = null
+alter.log.dirs.replication.quota.window.num = 11
+alter.log.dirs.replication.quota.window.size.seconds = 1
+authorizer.class.name =
+auto.create.topics.enable = true
+auto.leader.rebalance.enable = true
+background.threads = 10
+broker.heartbeat.interval.ms = 2000
+broker.id = 0
+broker.id.generation.enable = true
+broker.rack = null
+broker.session.timeout.ms = 9000
+client.quota.callback.class = null
+compression.type = producer
+connection.failed.authentication.delay.ms = 100
+connections.max.idle.ms = 600000
+connections.max.reauth.ms = 0
+control.plane.listener.name = null
+controlled.shutdown.enable = true
+controlled.shutdown.max.retries = 3
+controlled.shutdown.retry.backoff.ms = 5000
+controller.listener.names = null
+controller.quorum.append.linger.ms = 25
+controller.quorum.election.backoff.max.ms = 1000
+controller.quorum.election.timeout.ms = 1000
+controller.quorum.fetch.timeout.ms = 2000
+controller.quorum.request.timeout.ms = 2000
+controller.quorum.retry.backoff.ms = 20
+controller.quorum.voters = []
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+reblance：
+
+Rebalance 本质上是一种协议，规定了一个 Consumer Group 下的所有 consumer 如何达成一致，来分配订阅 Topic 的每个分区。
+
+例如：某 Group 下有 20 个 consumer 实例，它订阅了一个具有 100 个 partition 的 Topic 。正常情况下，kafka 会为每个 Consumer 平均的分配 5 个分区。这个分配的过程就是 Rebalance。
+
+触发 Rebalance 的时机
+Rebalance 的触发条件有3个。
+
+组成员个数发生变化。例如有新的 consumer 实例加入该消费组或者离开组。
+订阅的 Topic 个数发生变化。
+订阅 Topic 的分区数发生变化。
+Rebalance 发生时，Group 下所有 consumer 实例都会协调在一起共同参与，kafka 能够保证尽量达到最公平的分配。但是 Rebalance 过程对 consumer group 会造成比较严重的影响。在 Rebalance 的过程中 consumer group 下的所有消费者实例都会停止工作，等待 Rebalance 过程完成。
+
+Rebalance 过程分析
+Rebalance 过程分为两步：Join 和 Sync。
+
+Join 顾名思义就是加入组。这一步中，所有成员都向coordinator发送JoinGroup请求，请求加入消费组。一旦所有成员都发送了JoinGroup请求，coordinator会从中选择一个consumer担任leader的角色，并把组成员信息以及订阅信息发给leader——注意leader和coordinator不是一个概念。leader负责消费分配方案的制定。
+img
+
+Sync，这一步leader开始分配消费方案，即哪个consumer负责消费哪些topic的哪些partition。一旦完成分配，leader会将这个方案封装进SyncGroup请求中发给coordinator，非leader也会发SyncGroup请求，只是内容为空。coordinator接收到分配方案之后会把方案塞进SyncGroup的response中发给各个consumer。这样组内的所有成员就都知道自己应该消费哪些分区了。
+img
+
+Rebalance 场景分析
+新成员加入组
+img
+
+组成员“崩溃”
+组成员崩溃和组成员主动离开是两个不同的场景。因为在崩溃时成员并不会主动地告知coordinator此事，coordinator有可能需要一个完整的session.timeout周期(心跳周期)才能检测到这种崩溃，这必然会造成consumer的滞后。可以说离开组是主动地发起rebalance；而崩溃则是被动地发起rebalance。
+
+img
+
+组成员主动离开组
+img
+
+提交位移
+img
+
+如何避免不必要的rebalance
+要避免 Rebalance，还是要从 Rebalance 发生的时机入手。我们在前面说过，Rebalance 发生的时机有三个：
+
+组成员数量发生变化
+订阅主题数量发生变化
+订阅主题的分区数发生变化
+后两个我们大可以人为的避免，发生rebalance最常见的原因是消费组成员的变化。
+
+消费者成员正常的添加和停掉导致rebalance，这种情况无法避免，但是时在某些情况下，Consumer 实例会被 Coordinator 错误地认为 “已停止” 从而被“踢出”Group。从而导致rebalance。
+
+当 Consumer Group 完成 Rebalance 之后，每个 Consumer 实例都会定期地向 Coordinator 发送心跳请求，表明它还存活着。如果某个 Consumer 实例不能及时地发送这些心跳请求，Coordinator 就会认为该 Consumer 已经 “死” 了，从而将其从 Group 中移除，然后开启新一轮 Rebalance。这个时间可以通过Consumer 端的参数 session.timeout.ms进行配置。默认值是 10 秒。
+
+除了这个参数，Consumer 还提供了一个控制发送心跳请求频率的参数，就是 heartbeat.interval.ms。这个值设置得越小，Consumer 实例发送心跳请求的频率就越高。频繁地发送心跳请求会额外消耗带宽资源，但好处是能够更加快速地知晓当前是否开启 Rebalance，因为，目前 Coordinator 通知各个 Consumer 实例开启 Rebalance 的方法，就是将 REBALANCE_NEEDED 标志封装进心跳请求的响应体中。
+
+除了以上两个参数，Consumer 端还有一个参数，用于控制 Consumer 实际消费能力对 Rebalance 的影响，即 max.poll.interval.ms 参数。它限定了 Consumer 端应用程序两次调用 poll 方法的最大时间间隔。它的默认值是 5 分钟，表示你的 Consumer 程序如果在 5 分钟之内无法消费完 poll 方法返回的消息，那么 Consumer 会主动发起 “离开组” 的请求，Coordinator 也会开启新一轮 Rebalance。
+
+通过上面的分析，我们可以看一下那些rebalance是可以避免的：
+
+第一类非必要 Rebalance 是因为未能及时发送心跳，导致 Consumer 被 “踢出”Group 而引发的。这种情况下我们可以设置 session.timeout.ms 和 heartbeat.interval.ms 的值，来尽量避免rebalance的出现。（以下的配置是在网上找到的最佳实践，暂时还没测试过）
+
+设置 session.timeout.ms = 6s。
+设置 heartbeat.interval.ms = 2s。
+要保证 Consumer 实例在被判定为 “dead” 之前，能够发送至少 3 轮的心跳请求，即 session.timeout.ms >= 3 * heartbeat.interval.ms。
+将 session.timeout.ms 设置成 6s 主要是为了让 Coordinator 能够更快地定位已经挂掉的 Consumer，早日把它们踢出 Group。
+
+第二类非必要 Rebalance 是 Consumer 消费时间过长导致的。此时，max.poll.interval.ms 参数值的设置显得尤为关键。如果要避免非预期的 Rebalance，你最好将该参数值设置得大一点，比你的下游最大处理时间稍长一点。
+
+总之，要为业务处理逻辑留下充足的时间。这样，Consumer 就不会因为处理这些消息的时间太长而引发 Rebalance 。
+
+相关概念
+coordinator
+Group Coordinator是一个服务，每个Broker在启动的时候都会启动一个该服务。Group Coordinator的作用是用来存储Group的相关Meta信息，并将对应Partition的Offset信息记录到Kafka内置Topic(__consumer_offsets)中。Kafka在0.9之前是基于Zookeeper来存储Partition的Offset信息(consumers/{group}/offsets/{topic}/{partition})，因为ZK并不适用于频繁的写操作，所以在0.9之后通过内置Topic的方式来记录对应Partition的Offset。
+
+每个Group都会选择一个Coordinator来完成自己组内各Partition的Offset信息，选择的规则如下：
+
+1，计算Group对应在__consumer_offsets上的Partition
+2，根据对应的Partition寻找该Partition的leader所对应的Broker，该Broker上的Group Coordinator即就是该Group的Coordinator
+Partition计算规则：
+
+复制代码
+1
+SWIFT
+partition-Id(__consumer_offsets) = Math.abs(groupId.hashCode() % groupMetadataTopicPartitionCount)
+其中groupMetadataTopicPartitionCount对应offsets.topic.num.partitions参数值，默认值是50个分区
+
+一次Rebalance所耗时间
+测试环境
+1个Topic，10个partition，3个consumer
+
+在本地环境进行测试
+
+测试结果
+经过几轮测试发现每次rebalance所消耗的时间大概在 80ms~100ms平均耗时在87ms左右。
+
+ 
+
+session.timeout.ms
+非常重要的参数之一 ！
+
+session.timeout.ms 是 consumer group 检测组内成员发送崩溃的时间 。
+
+假设你设置该参数为 5 分钟，那么当某个 group 成员突然崩攒了（比如被 kill -9 或岩机）， 管理 group 的 Kafka 组件（即消费者组协调者，也称 group coordinator）有可能需要 5 分钟才能感知到这个崩溃。显然我们想要缩短这个时间，让coordinator 能够更快地检测到 consumer 失败 。
+
+这个参数还有另外一重含义 ：consumer 消息处理逻辑的最大时间。
+
+倘若 consumer 两次 poll 之间的间隔超过了该参数所设置的阑值，那么 coordinator 就会认为这个 consumer 己经追不上组内其他成员的消费进度了，因此会将该 consumer 实例“踢出”组，该 consumer 负责的分区也会被分配给其他 consumer。
+
+在最好的情况下，这会导致不必要的 rebalance，因为 consumer 需要重新加入 groupo 更糟的是，对于那些在被踢出 group 后处理的消息， consumer 都无法提交位移一一这就意味着这些消息在rebalance 之后会被重新消费一遍。如果一条消息或一组消息总是需要花费很长的时间处理，那么 consumer 甚至无法执行任何消费，除非用户重新调整参数 。鉴于以上的“窘境”， Kafka 社区于 0 .10.1.0 版本对该参数的含义进行了拆分 。 在该版本及以后的版本中， session.timeout.ms 参数被明确为“ coordinator 检测失败的时间” 。
+
+因此在实际使用中，用户可以为该参数设置一个比较小的值，让 coordinator 能够更快地检测 consumer 崩溃的情况，从而更快地开启 rebalance，避免造成更大的消费滞后（ consumer lag ） 。 目前该参数的默认值是 10 秒。
+
+max.poll.interval.ms
+​ 如前所述， session. neout.ms 中“ consumer 处理逻辑最大时间”的含义被剥离出来了，
+Kafka 为 i主部分含义单独开放了 一个参数一一max.poll.interval.ms 。在一个典型的 consumer 使用
+场景中，用户对于消息的处理可能需要花费很长时间。这个参数就是用于设置消息处理逻辑的
+最大时间的 。 假设用户的业务场景中消息处理逻辑是把消息、“落地”到远程数据库中，且这个
+过程平均处理时间是 2 分钟，那么用户仅需要将 max.poll.interval.ms 设置为稍稍大于 2 分钟的值
+即可，而不必为 session. neout.ms 也设置这么大的值。
+通过将该参数设置成实际的逻辑处理时间再结合较低的 session.timeout.ms 参数值，
+consumer group 既实现了快速的 consumer 崩溃检测，也保证了复杂的事件处理逻辑不会造成不
+必要的 rebalance 。
+
+
+ 
+
+https://blog.csdn.net/wufaliang003/article/details/106425861
+
+https://www.cnblogs.com/rainwang/p/7496147.html
+
+https://www.cnblogs.com/lizherui/p/12275193.html
+
+ ----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+consumer：
+
+https://medium.com/bakdata/solving-my-weird-kafka-rebalancing-problems-c05e99535435
+
+
+
+ 
+
+ 
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+参数tips：
+
+group.max.session.timeout.ms in the server.properties > session.timeout.ms in the consumer.properties.
+group.min.session.timeout.ms in the server.properties < session.timeout.ms in the consumer.properties.
+request.timeout.ms > session.timeout.ms + fetch.wait.max.ms
+(session.timeout.ms)/3 > heartbeat.interval.ms
+session.timeout.ms > Worst case processing time of Consumer Records per consumer poll(ms).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ 
+
+kafka确保每个partition只能同一个group中的同一个consumer消费，如果想要重复消费，那么需要其他的组来消费
+
+ 
+
+假设一个topic test 被groupA消费了，现在启动另外一个新的groupB来消费test，默认test-groupB的offset不是0，而是没有新建立，除非当test有数据的时候，
+
+groupB会收到该数据，该条数据也是第一条数据，groupB的offset也是刚初始化的ofsert, 除非用显式的用–from-beginnging 来获取从0开始数据 （就是新加的从加的地方消费，不是从头消费）
+
+ 
+
+  Topic在逻辑上可以被认为是一个queue，每条消费都必须指定它的Topic，可以简单理解为必须指明把这条消息放进哪个queue里。为了使得Kafka的吞吐率可以线性提高，物理上把Topic分成一个或多个Partition，每个Partition在物理上对应一个文件夹，该文件夹下存储这个Partition的所有消息和索引文件。若创建topic1和topic2两个topic，且分别有13个和19个分区，则整个集群上会相应会生成共32个文件夹
+
+Kafka提供两种策略删除旧数据。一是基于时间，二是基于Partition文件大小。
+     例如可以通过配置$KAFKA_HOME/config/server.properties，让Kafka删除一周前的数据，也可在Partition文件超过1GB时删除旧数据
+ 
+因为offet由Consumer控制，所以Kafka broker是无状态的，它不需要标记哪些消息被哪些消费过
+ 
+Producer发送消息到broker时，会根据Paritition机制选择将其存储到哪一个Partition。如果Partition机制设置合理，所有消息可以均匀分布到不同的Partition里，这样就实现了负载均衡。如果一个Topic对应一个文件，那这个文件所在的机器I/O将会成为这个Topic的性能瓶颈，而有了Partition后，不同的消息可以并行写入不同broker的不同Partition里，极大的提高了吞吐率。可以在$KAFKA_HOME/config/server.properties中通过配置项num.partitions来指定新建Topic的默认Partition数量
+ 
+在发送一条消息时，可以指定这条消息的key，Producer根据这个key和Partition机制来判断应该将这条消息发送到哪个Parition。Paritition机制可以通过指定Producer的paritition. class这一参数来指定，该class必须实现kafka.producer.Partitioner接口。本例中如果key可以被解析为整数则将对应的整数与Partition总数取余，该消息会被发送到该数对应的Partition
+ 
+使用Consumer high level API时，同一Topic的一条消息只能被同一个Consumer Group内的一个Consumer消费，但多个Consumer Group可同时消费这一消息。
+
+ 
+
+ -------------------------------------------------------------------------------------------------------------------------------------------------
+
+应用：
+
+ 我们的场景，不同的杀毒引擎有不同的license，有的只允许一个license，有的允许多个license，就相当于有的只能起一个进程，有的可以起多个进程。这样的话就相当于有的consumer group 只能有一个consumer，有的consumer group 可以有多个consumer，我们一台机器部署了一个杀毒引擎，一共四台机器。那么consumer group的数量，就是引擎的数量。consumer group里consumer的个数，就是引擎能起的进程数，也就是允许的license数。那么我们的consumer group里consumer的数量就是从1到4个。而kafka一个partition只能被同一个consumer group下的一个consumer消费，所以为了均衡，那就需要1 2 3 4的最小公倍数个partition数量。
+
+
+
+
+--------------------------------------------------------------------------------------------
+trouble shooting：
+参数列表：https://www.cnblogs.com/weixiuli/p/6413109.html
+
+comodo 、gdata等 扫描23兆的文件，扫描结果发送到kafka会出现超大信息流，kafka server: Message w
+as too large, server rejected it to avoid allocation error。消息被nack了，但是由于引擎标识文件已经删除了，导致第二次不扫描，直接ack，然后消息丢失
+
+
+明白是那个rawdata字段超大了吧
+大概率是那个字段，日志截不出来
+要不然就先把那个字段置为空  
+要不然就改kafka的配置
+
+#broker能接收消息的最大字节数
+message.max.bytes=10485760 (10M)
+#broker可复制的消息的最大字节数
+replica.fetch.max.bytes=10485760 (10M)
+#消费者端的可读取的最大消息
+fetch.message.max.bytes=10485760 (10M)
+
+# socket请求的最大字节数。为了防止内存溢出，message.max.bytes必然要小于
+socket.request.max.bytes = 104857600
