@@ -1,0 +1,17 @@
+1，执行
+
+strach df -h 命令，追踪看哪里卡住
+
+显示stat("/shell"   卡住
+
+2，执行mount  看都有哪些挂载
+
+ip6:/shell on /shell type nfs4 (rw,relatime,vers=4.1,,hard,proto=tcp,timeo=600,retrans=2,sec=sys,clientaddr=机器所在ip,local_lock=none,addr=IP6)
+
+发现shell挂载了nfs
+
+3，而正好ip6这个机器有变更导致nfs服务中断
+
+4，shell不能正常挂载 ，所以df -h卡住
+
+5，解决方法，让nfs正常服务。或者关掉nfs
