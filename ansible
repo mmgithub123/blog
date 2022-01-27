@@ -1,0 +1,113 @@
+install
+
+ 
+
+$ sudo yum install epel-release
+$ sudo yum install ansible
+
+
+rpm -ql ansible
+/etc/ansible
+/etc/ansible/ansible.cfg
+/etc/ansible/hosts
+/etc/ansible/roles
+/usr/bin/ansible
+/usr/bin/ansible-2
+/usr/bin/ansible-2.7
+/usr/bin/ansible-config
+/usr/bin/ansible-connection
+/usr/bin/ansible-console
+/usr/bin/ansible-console-2
+/usr/bin/ansible-console-2.7
+/usr/bin/ansible-doc
+/usr/bin/ansible-doc-2
+/usr/bin/ansible-doc-2.7
+/usr/bin/ansible-galaxy
+/usr/bin/ansible-galaxy-2
+/usr/bin/ansible-galaxy-2.7
+/usr/bin/ansible-inventory
+/usr/bin/ansible-playbook
+/usr/bin/ansible-playbook-2
+/usr/bin/ansible-playbook-2.7
+/usr/bin/ansible-pull
+/usr/bin/ansible-pull-2
+/usr/bin/ansible-pull-2.7
+/usr/bin/ansible-vault
+/usr/bin/ansible-vault-2
+/usr/bin/ansible-vault-2.7
+
+
+
+
+验证安装：
+ansible all -m ping 
+
+
+copy 模块，复制文件
+ansible web -m copy -a 'src=~/hello dest=/data/hello'
+
+带权限copy
+ansible nsqd -m copy -a "src=/opt/nsq/nsqlookupd dest=/opt/nsq/ mode=0755"  注意这里前边的补零 用0755
+
+
+
+shell模块执行命令
+ansible web -m shell -a 'cat /etc/passwd |grep "keer"'
+
+yum 模块：
+ansible all -m yum -a 'name=nginx state=latest'   安装最新nginx
+
+
+
+ansible执行sed：
+ansible samba-client -m shell -a "sed -i '\$d' /etc/fstab"   （注意这里的$要转义）
+
+
+如果不使用公钥免密的方式，可使用-k参数，要求输入密码：（同时配置文件要打开host_key_checking 参数，不验证主机签名）
+ansible etcd -m shell -a "systemctl status etcd" -k
+
+
+ansible中使用sudo执行，注意新版本ansible 已经弃用--sudo参数，需要使用--become系列参数：
+先在配置文件/etc/ansible/ansible.cfg中开启，sudo  将#sudo_user      = zhangsan 注释去掉，并确保zhangsan是具有目标机器的sudo权限的，然后执行
+ ansible post -m copy -a "src='/home/zhangsan/cloudscan/systemd_service_file/cspost.service' dest='/usr/lib/systemd/system/'" -k  --become  --become-method=sudo  --become-user=root
+
+
+
+
+ansible  sudo copy 没有改变文件的属主：
+原来是app用户app组，用sudo copy后还是app:app
+ansible front -m copy -a "src='/home/hjx/cloudscan/app_bin/v0.0.1/csfront' dest='/opt/cloudscan/' mode=0755" -k --become --become-method=sudo --become-user=root
+
+10.6 | CHANGED => {
+"ansible_facts": {
+"discovered_interpreter_python": "/usr/bin/python"
+},
+"changed": true,
+"checksum": "33a0d46c42eefa9deb",
+"dest": "/opt/cloudscan/csfront",
+"gid": 1008,
+"group": "app",
+"md5sum": "5ac941ec3ff27fb3eedc",
+"mode": "0755",
+"owner": "app",
+"size": 3612,
+"src": "/home/hxj/.ansible/tmp/ansible-tmp-1643177945.72-28485-120808158151379/source",
+"state": "file",
+"uid": 10000
+}
+10.5 | CHANGED => {
+"ansible_facts": {
+"discovered_interpreter_python": "/usr/bin/python"
+},
+"changed": true,
+"checksum": "33a0dc93bce746c42eefa9deb",
+"dest": "/opt/cloudscan/csfront",
+"gid": 1007,
+"group": "app",
+"md5sum": "5ac4222d941ec3ff27fb3eedc",
+"mode": "0755",
+"owner": "app",
+"size": 3619,
+"src": "/home/hjx/.ansible/tmp/ansible-tmp-1643177945.72-28484-23458988881562/source",
+"state": "file",
+"uid": 10000
