@@ -1,0 +1,269 @@
+make test 时需要：
+
+安装一下8.5或者最新的tcl
+
+1
+2
+3
+4
+5
+6
+[root@etcd3 tmp]# wget http://downloads.sourceforge.net/tcl/tcl8.6.1-src.tar.gz
+[root@etcd3 tmp]# tar xzvf tcl8.6.1-src.tar.gz  -C /usr/local/
+[root@etcd3 tmp]# cd  /usr/local/tcl8.6.1/unix/
+[root@etcd3 unix]# ./configure
+[root@etcd3 unix]# make
+[root@etcd3 unix]# make isntall
+ 
+ 
+
+ 
+
+安装gcc：
+
+yum install gcc -y  
+
+yum install systemd-devel   systemd代码文件 
+wget http://download.redis.io/redis-stable.tar.gz
+tar xvzf redis-stable.tar.gz
+cd redis-stable
+
+make USE_SYSTEMD=yes  PREFIX=/usr/local/redis/ install
+make test
+
+
+
+ which redis-server
+/usr/local/redis/bin
+
+加入环境变量
+
+vi /etc/profile
+
+#redis
+export PATH=/usr/local/redis/bin:$PATH
+
+ 
+
+source /etc/profile
+
+ 
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+配置文件：在分发源码包里有
+
+redis-6.2.6/ redis.conf
+
+ 
+
+源码包目录  utils/  下有实用资源工具
+
+如启动脚本：redis_init_script 
+
+systemd service文件:   
+
+utils/systemd-redis_server.service
+ 
+
+redis的systemd启动讨论：
+
+https://github.com/redis/redis/issues/7217
+
+ 
+
+编译时，需要加入对systemd的支持，否则启动报错，
+
+systemd supervision requested or auto-detected, but Redis is compiled without libsystemd support!
+ 
+
+ 
+
+官网https://www.freedesktop.org/software/systemd/man/systemd.exec.html#
+
+EnvironmentFile=
+
+Similar to Environment= but reads the environment variables from a text file. The text file should contain new-line-separated variable assignments. Empty lines, lines without an "=" separator, or lines starting with ; or # will be ignored, which may be used for commenting. A line ending with a backslash will be concatenated with the following one, allowing multiline variable definitions. The parser strips leading and trailing whitespace from the values of assignments, unless you use double quotes (").
+
+可以直接在ExecStart 命令行里指定配置文件，
+
+命令行必须以一个可执行文件(要么是绝对路径、要么是不含任何斜线的文件名)开始， 并且其后的那些参数将依次作为"argv[1] argv[2] …"传递给被执行的进程。
+
+）
+
+ 
+
+
+复制配置文件 redis.conf  到/etc
+
+用下面的server配置，并建立redis用户和组
+# /usr/lib/systemd/system/redis_server.service
+# example systemd service unit file for redis-server
+#
+# In order to use this as a template for providing a redis service in your
+# environment, _at the very least_ make sure to adapt the redis configuration
+# file you intend to use as needed (make sure to set "supervised systemd"), and
+# to set sane TimeoutStartSec and TimeoutStopSec property values in the unit's
+# "[Service]" section to fit your needs.
+#
+# Some properties, such as User= and Group=, are highly desirable for virtually
+# all deployments of redis, but cannot be provided in a manner that fits all
+# expectable environments. Some of these properties have been commented out in
+# this example service unit file, but you are highly encouraged to set them to
+# fit your needs.
+#
+# Please refer to systemd.unit(5), systemd.service(5), and systemd.exec(5) for
+# more information.
+
+[Unit]
+Description=Redis data structure server
+Documentation=https://redis.io/documentation
+#Before=your_application.service another_example_application.service
+#AssertPathExists=/var/lib/redis
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify    
+#ExecStart=/usr/local/bin/redis-server --supervised systemd
+## Alternatively, have redis-server load a configuration file:
+ExecStart=/usr/local/redis/bin/redis-server /etc/redis.conf --supervised systemd
+User=redis
+Group=redis
+
+[Install]
+WantedBy=multi-user.target
+
+
+ 
+
+notify类型
+
+ExecStart 命令行中指定配置
+
+User=redis
+Group=redis  建立用户和组
+
+ 
+
+ 有个问题：二进制程序属于root，在redis systemd service里配置为user redis，是可以启动的。并且进程也是属于redis。但kibana不行。
+
+[Service]
+Type=notify
+ExecStart=/usr/local/redis/bin/redis-server /etc/redis.conf --supervised systemd
+User=redis
+Group=redis
+
+
+test1 ~]# ls -lah /usr/local/redis/bin/redis-server
+-rwxr-xr-x. 1 root root 9.1M  /usr/local/redis/bin/redis-server
+
+
+
+
+-----------------------------------------------------------------------------------
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+redis 启动脚本源码：
+#!/bin/sh
+#
+# Simple Redis init.d script conceived to work on Linux systems
+# as it does use of the /proc filesystem.
+
+### BEGIN INIT INFO
+# Provides: redis_6379
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Redis data structure server
+# Description: Redis data structure server. See https://redis.io
+### END INIT INFO
+
+REDISPORT=6379
+EXEC=/usr/local/bin/redis-server
+CLIEXEC=/usr/local/bin/redis-cli
+
+PIDFILE=/var/run/redis_${REDISPORT}.pid
+CONF="/etc/redis/${REDISPORT}.conf"
+
+case "$1" in
+start)
+if [ -f $PIDFILE ]
+then
+echo "$PIDFILE exists, process is already running or crashed"
+else
+echo "Starting Redis server..."
+$EXEC $CONF
+fi
+;;
+stop)
+if [ ! -f $PIDFILE ]
+then
+echo "$PIDFILE does not exist, process is not running"
+else
+PID=$(cat $PIDFILE)
+echo "Stopping ..."
+$CLIEXEC -p $REDISPORT shutdown
+while [ -x /proc/${PID} ]
+do
+echo "Waiting for Redis to shutdown ..."
+sleep 1
+done
+echo "Redis stopped"
+fi
+;;
+*)
+echo "Please use start or stop as first argument"
+;;
+esac
+
+ 
+
+ 
+
+使用：
+
+ redis-cli
+
+127.0.0.1:6379> config get requirepass
+1) "requirepass"
+2) ""
+
+查询参数
+
+ 
+
+设置参数：
+
+127.0.0.1:6379> config set requirepass 123
+OK
+
+认证
+
+redis 127.0.0.1:6379> auth 123
+OK
+
+ 
+
+远程使用：
+
+redis-cli -h 10.0.0.0 -p 6379 -a redispassword
+10.:6379>
+10.:6379> info
+
+# Server
+redis_version:4.0.14
+redis_git_sha1:00000000
+redis_git_dirty:0
+
+---------------------------------------------------------------------------------------------
+
+访问控制：官网：https://redis.io/topics/acl
+
+在redis6之前，没有访问控制的说法，默认用户可以执行任何命令操作任何key，不过可以设定密码使用requirepass参数配置。redis6默认为了向下兼容，还是这个行为。In the default configuration, Redis 6 (the first version to have ACLs) works exactly like older versions of Redis, that is, every new connection is capable of calling every possible command and accessing every key, so the ACL feature is backward compatible with old clients and applications. Also the old way to configure a password, using the requirepass configuration directive, still works as expected, but now what it does is just to set a password for the default user.
