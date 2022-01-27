@@ -1,0 +1,127 @@
+服务端：
+
+yum install nfs-utils rpcbind -y
+
+编辑/etc/exports ，添加以下内容
+
+      /data    192.168.1.0/24(rw,async)    允许哪个网段访问哪个目录
+
+ 
+
+mkdir -p /data
+
+chown -R nfsnobody.nfsnobody /data  (重点)
+
+ 
+
+systemctl start nfs
+
+systemctl start rpcbind
+
+systemctl enable nfs
+
+systemctl enable rpcbind
+
+ 
+
+就是编辑/etc/exports  写上运行哪个网段访问哪个目录，然后建好这个目录并加上相应权限。
+
+ 
+
+服务端放通防火墙
+
+firewall-cmd --zone=public --list-ports
+111/tcp 111/udp 2049/udp 2049/tcp 892/tcp 892/udp 20048/udp 20048/tcp
+
+firewall-cmd --zone=public --add-port=20048/udp --permanent
+
+firewall-cmd --reload
+
+ 
+
+客户端：
+
+安装，启动 ,nfs-utils rpcbind 
+
+showmount -e 服务的地址ip 查看
+
+mount -t nfs 服务端地址ip:/data /data  挂载（就是服务端的data目录，可以当自己的data目录用）
+
+ 
+
+如果需要nfs开机自动挂载，则需要向/etc/fstab写入：
+
+ 10.10.33.38:/data       /mnt/data/              nfs     defaults        0 0
+ 
+
+总的来说，就是 服务端编辑/etc/exports  写上运行哪个网段访问哪个目录，然后建好这个目录并加上相应权限。
+
+客户端mount -t nfs 服务端地址ip:/data /data 挂载，中间需要放通防火墙
+
+ 
+
+------------------------------------------------------------------------------------------------------------
+
+维护命令：
+
+exportfs命令需要参考配置文件“/etc/exportfs”。也可以直接在命令行中指定要共享的NFS文件系统。
+
+语法格式: export [参数] [目录]
+
+常用参数：
+
+-a	全部挂载或者全部卸载
+-r	重新挂载
+-u	卸载某一个目录
+-v	显示共享目录
+ 
+
+xports：配置nfs的文件
+
+exportfs：linux命令
+
+当修改了/etc/exports后，并不需要重启nfs服务，只要用exportfs重新扫描一次/etc/exports，并且重新加载即可
+
+exportfs[-aruv] 
+
+参数 含义 
+a 全部挂载(或卸载)/etc/exports档案内的设定 
+r 重新挂载/etc/exports 里面的设定，也同步的更新/etc/exports和/var/lib/nfs/xtab里面的内容 
+u 卸载某一目录 
+v 在export的时候，将分享的目录显示到荧屏上 
+#exportfs -rv//重新export一次 
+#exportfs -au//全部卸载 
+
+#：exportfs -r  //重新挂载一次  /etc/exports 这里里面的内容；
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+troubleshooting:
+
+1,nfs客户端所在机器，敲df -h 命令卡死。原因是nfs服务端的机器有变更，导致服务的nfs没有启动，或者客户端不能与nfs服务端正常通信，nfs客户端不能挂载到目录，导致卡住。解决方法，使nfs服务端正常运行即可。
+
+ 
+
+2,Jan 12 21:59:09 test3 systemd[1]: Unable to break cycle
+Jan 12 21:59:09 test3 systemd[1]: Found dependency on nfs-server.service/start
+Jan 12 21:59:09 test3 systemd[1]: Found dependency on opt-data.mount/start
+Jan 12 21:59:09 test3 systemd[1]: Found ordering cycle on nfs-server.service/start                                                                                                     
+
+早上nfs这个问题，我复现了。154一直是nfs server。其他都是client。最开始也只配了153为client，后来加的55，56，57.
+
+但不知道155为什么也变成server了。之前有上去操作吗？原因就是155做为客户端去mount 154的/opt/data.但如果它又是server，
+
+是需要向外提供的，所以会死锁。日志里就是Unable to break cycle关键字
+
+ 
+
+3,nfs 客户端卡死，df -h,以及lsof都没有反应。此时需要重启服务端，然后在客户端执行lsof，之后卸载客户端挂载，就可以重新挂载了
+
+---------------------------------------------------------------------------------------------------------------------
+
+配合es 解决方案：
+
+https://www.elastic.co/guide/en/elasticsearch/reference/current/snapshots-register-repository.html
+By default, a network file system (NFS) uses user IDs (UIDs) and group IDs (GIDs) to match accounts across nodes. If your shared file system is an NFS and your nodes don’t use the same UIDs and GIDs, update your NFS configuration to account for this.
+
+ 
