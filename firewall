@@ -1,0 +1,169 @@
+在防火墙上放行端口111-udp/tcp、892-tcp/udp 20048 tcp/udp就可以；
+
+[root@nfs ~]# firewall-cmd --zone=public --add-port=892/tcp --permanent（这个参数指定配置永久生效）
+success
+[root@nfs ~]# firewall-cmd --zone=public --add-port=111/udp --permanent
+success
+ firewall-cmd --zone=public --add-port=20048/udp --permanent
+
+
+[root@nfs ~]# firewall-cmd --reload
+success
+[root@nfs ~]#  firewall-cmd --zone=public --list-ports
+892/tcp 111/udp
+
+
+在RHEL7系统中，firewalld防火墙取代了iptables防火墙。我们都知道iptables的防火墙策略是交由内核层面的netfilter网络过滤器来处理的
+，而firewalld则是交由内核层面的nftables包过滤框架来处理。
+
+
+查看区域设置，默认public zone，--zone 指定zone的名字
+firewall-cmd --list-all # 查看区域设置
+firewall-cmd --zone=external --list-all
+
+
+查看预定义zone
+firewall-cmd --get-zones
+
+
+设定默认区域：
+firewall-cmd --set-default=zonename
+
+查看已支持的服务：
+firewall-cmd --zone=external --list-services
+
+禁掉某个服务：
+sudo firewall-cmd --permanent --zone=external --remove-service=ftp
+
+既可以以service的方式管理，也可以以port的方式管理
+
+
+配置白名单，ip地址集。也不只是白名单，就是想应用的ip地址集：
+/etc/firewalld/ipsets/
+
+查看ipset帮助文档：
+man firewalld.ipset
+
+This example configuration file shows the structure of an ipset configuration file:
+
+<?xml version="1.0" encoding="utf-8"?>
+<ipset type="hash:ip">
+<short>My Ipset</short>
+<description>description</description>
+<entry>1.2.3.4</entry>
+<entry>1.2.3.5</entry>
+<entry>1.2.3.6</entry>
+</ipset>
+
+ 
+
+比如创建一个ip地址集：
+
+cat /etc/firewalld/ipsets/white-list.xml
+<?xml version="1.0" encoding="utf-8"?>
+<ipset type="hash:ip">
+<short>test env white list</short>
+<description>description</description>
+<entry>192.168.102</entry>
+<entry>192.168.10</entry>
+</ipset>
+
+ 
+
+将地址集应用到规则
+
+firewall-cmd --permanent --add-rich-rule 'rule family="ipv4" source ipset="white-list"  accept'
+firewall-cmd --reload
+
+查看地址集白名单列表：
+
+firewall-cmd --permanent --ipset=white-list --get-entries
+
+ 
+
+新增，删除IP地址
+firewall-cmd --permanent --ipset=     --add-entry="192.168.81.190"
+firewall-cmd --permanent --ipset=     --remove-entry="192.168.81.190"
+firewall-cmd --reload
+注：此方法新增，删除是ipset配置文件配置项
+
+ 
+
+清除或删除ipset
+清除ipset的xml配置文件信息
+firewall-cmd --permanent --delete-ipset=white-list
+
+清除ipset list信息
+ipset destroy white-list
+
+5、查看ipset信息
+1）查看ipset名称
+firewall-cmd --get-ipsets
+
+2）查看ipset详细信息
+firewall-cmd --info-ipset white-list
+
+ 
+
+ 
+
+白名单：
+
+使mysql服务的3306端口只允许192.168.1.1/24网段的服务器能访问
+#添加规则
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="192.168.1.1/24" port protocol="tcp" port="3306" accept"
+#reload使生效
+firewall-cmd --reload
+
+
+IP 列表逐一加入 trusted 区域，使用命令如下：
+$ firewall-cmd --permanent --zone=trusted --add-source=173.245.48.0/20
+$ firewall-cmd --permanent --zone=trusted --add-source=131.0.72.0/22
+使 trusted 区域设置生效，使用命令如下：
+$ firewall-cmd --reload
+
+
+确认 trusted 区域是否设置正确，使用命令如下：
+
+$ firewall-cmd --zone=trusted --list-all
+返回：
+
+trusted (active)
+target: ACCEPT
+icmp-block-inversion: no
+interfaces:
+sources: 173.245.48.0/20 …… 131.0.72.0/22
+services:
+ports:
+protocols:
+masquerade: no
+forward-ports:
+source-ports:
+icmp-blocks:
+rich rules:
+因为此时已经设置了 trusted 区域，所以还需要切换默认区域从 public 到 drop，以达到无视所有接入连接的目的。使用命令如下：
+
+$ firewall-cmd --set-default-zone=drop
+再将默认网卡 eth0 分配给 drop 区域，使用命令如下：
+
+$ firewall-cmd --permanent --zone=drop --change-interface=eth0
+使白名单最终生效，使用命令如下（注意：请再次确认你的所有 IP 都加入了 trusted 区域）：
+
+$ firewall-cmd --reload
+至此，白名单设置正式生效。
+
+网段表示规则
+10.0.0.0/8 10.0.0.0-10.255.255.255
+172.16.0.0/16 172.16.0.0-172.16.255.255
+192.168.0.0/16 192.168.0.0-192.168.255.255
+176.1.1.0/24 176.1.1.1-176.1.1.254
+180.166.0.0/16 180.166.0.0-180.166.255.255
+187.187.0.0/16 180.187.0.0-180.187.255.255
+188.188.0.0/16 188.188.0.0-188.188.255.255
+188.189.0.0/16 188.189.0.0-188.189.255.255
+188.190.0.0/16 188.190.0.0-188.190.255.255
+190.190.0.0/24 190.190.0.0.1-190.190.0.254
+193.0.0.0/8 193.0.0.0-193.255.255.255
+194.0.0.0/8 194.0.0.0-194.255.255.255
+200.188.0.0/16 200.188.0.0-200.188.255.255
+200.190.0.0/16 200.190.0.0-200.190.255.255
