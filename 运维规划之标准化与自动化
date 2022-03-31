@@ -1,3 +1,5 @@
+一，运维标准化：
+
 程序启动的用户 
 程序systemd service文件
 主目录
@@ -11,7 +13,6 @@ home
 
 Home of the Filebeat installation.
 
- 	
 path.home主目录
 
 bin
@@ -20,7 +21,6 @@ The location for the binary files.
 
 {path.home}/bin二进制
 
- 
 config
 
 The location for configuration files.
@@ -45,7 +45,6 @@ The location for the logs created by Filebeat.
 
 path.logs
 
- 
  
 
 安装部署：
@@ -73,6 +72,14 @@ mongodb，用mongod用户和mongod组
 /etc/etcd.conf
 
 /etc/nginx/default.conf
+
+配置文件的权限，基本都是只有root用户可以更改以及所运行的程序可以更改。
+
+一般默认是属于root用户，且权限为644
+
+ the config file at /etc/{beatname}/{beatname}.yml will have the proper owner and permissions.
+
+The file is owned by root and has file permissions of 0644 (-rw-r--r--).
 
  
 
@@ -104,7 +111,41 @@ mongodb，用mongod用户和mongod组
 
 -----------------------------------------------------------------------------------------------------------------------------------------
 
-运维实施：
+二，运维自动化：
+
+（
+
+发布系统：
+
+现在已经有了基于gitlab，flask，ansible的cicd发布系统：https://www.cnblogs.com/mmgithub123/p/15951497.html，
+
+   然后按发布系统做checklist：
+
+1，wiki里的cmdb，有变更第一时间更新，这里cmdb可以做成程序自动化
+
+2，git里的发布系统资产配置。：
+
+       配置：/-/tree/main/conf
+
+       脚本：/-/tree/main/script
+
+       systemd的配置：/-/tree/main/systemdService
+
+       注意：目前Windows的进程管理配置文件还没有自动解决的方案，如果有更新，目前需要手动停止，copy，在手动启动
+
+       hosts的配置，所以运行资产的数据来源，很重要 /-/blob/main/hosts
+
+3，更改falcon监控系统相关配置，这里也可以程序调用falcon接口自动化
+
+4，进行引擎的checklist：扩容引擎 checklist，这是业务相关的checklist
+
+6，最后验证程序运行正常：sh all_element_per_status_ansible.sh ，  sh windows_all_element_per_status_ansible.sh
+
+）
+
+ 
+
+安装部署中间件：
 
 0，提前部署好中间件，比如etcd，kafka，redis，mongodb，samba，对象存储，jaeger等
 
@@ -118,6 +159,13 @@ sudo mount -t cifs  //ip地址/scandata /opt/scandata -o uid=（指定挂载后�
 
  
 
+mongodb最佳实践
+mysql
+mongodb 
+mongodb分片架构
+etcd
+redis
+kafka
 应用程序发布实施：
 
 1，建立程序账户：testuser系统账户 uid为10000 属于testuser组 没有登录shell
@@ -182,14 +230,22 @@ trid等
 
  
 
- 6，接入日志ELK
+ 6，接入日志
 
+eck：Elasticsearch running in k8s use Kubernetes operator
+es 
  
 
-7，接入监控open-falcon
+7，接入监控
 
+open-falcon
+基准测试+线上监控图形+报警阈值 
+sre之监控报警---当我们监控报警的时候我们应该监控报警什么？
  
 
+备份方案：
+
+备份
  
 
 盘点资产（生产发布review）做物理及逻辑架构图
@@ -216,18 +272,5 @@ trid等
 容量规划
 扫描量 20到50万
 查询量时扫描量二到5倍（有突增）
-
- 
-
-日志接入
-
-
-falcon监控接入
-
- 
-
-备份方案
-
-https://www.cnblogs.com/mmgithub123/p/15770507.html
 
  
